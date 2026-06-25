@@ -10,6 +10,7 @@ This README will guide you through the process of using the generated JavaScript
 - [**Queries**](#queries)
   - [*GetCurrentUser*](#getcurrentuser)
   - [*GetUserByPhone*](#getuserbyphone)
+  - [*GetUserRoleForClaims*](#getuserroleforclaims)
   - [*GetUserRoles*](#getuserroles)
   - [*GetStudentsByBranch*](#getstudentsbybranch)
   - [*GetStudentsBySection*](#getstudentsbysection)
@@ -526,6 +527,119 @@ const ref = getUserByPhoneRef({ phoneNumber: ..., });
 // You can also pass in a `DataConnect` instance to the `QueryRef` function.
 const dataConnect = getDataConnect(connectorConfig);
 const ref = getUserByPhoneRef(dataConnect, getUserByPhoneVars);
+
+// Call `executeQuery()` on the reference to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeQuery(ref);
+
+console.log(data.users);
+
+// Or, you can use the `Promise` API.
+executeQuery(ref).then((response) => {
+  const data = response.data;
+  console.log(data.users);
+});
+```
+
+## GetUserRoleForClaims
+You can execute the `GetUserRoleForClaims` query using the following action shortcut function, or by calling `executeQuery()` after calling the following `QueryRef` function, both of which are defined in [dataconnect-generated/index.d.ts](./index.d.ts):
+```typescript
+getUserRoleForClaims(vars: GetUserRoleForClaimsVariables, options?: ExecuteQueryOptions): QueryPromise<GetUserRoleForClaimsData, GetUserRoleForClaimsVariables>;
+
+interface GetUserRoleForClaimsRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: GetUserRoleForClaimsVariables): QueryRef<GetUserRoleForClaimsData, GetUserRoleForClaimsVariables>;
+}
+export const getUserRoleForClaimsRef: GetUserRoleForClaimsRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `QueryRef` function.
+```typescript
+getUserRoleForClaims(dc: DataConnect, vars: GetUserRoleForClaimsVariables, options?: ExecuteQueryOptions): QueryPromise<GetUserRoleForClaimsData, GetUserRoleForClaimsVariables>;
+
+interface GetUserRoleForClaimsRef {
+  ...
+  (dc: DataConnect, vars: GetUserRoleForClaimsVariables): QueryRef<GetUserRoleForClaimsData, GetUserRoleForClaimsVariables>;
+}
+export const getUserRoleForClaimsRef: GetUserRoleForClaimsRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the getUserRoleForClaimsRef:
+```typescript
+const name = getUserRoleForClaimsRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `GetUserRoleForClaims` query requires an argument of type `GetUserRoleForClaimsVariables`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface GetUserRoleForClaimsVariables {
+  firebaseUID: string;
+}
+```
+### Return Type
+Recall that executing the `GetUserRoleForClaims` query returns a `QueryPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `GetUserRoleForClaimsData`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface GetUserRoleForClaimsData {
+  users: ({
+    role: string;
+    branchId?: UUIDString | null;
+    isActive: boolean;
+  })[];
+}
+```
+### Using `GetUserRoleForClaims`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, getUserRoleForClaims, GetUserRoleForClaimsVariables } from '@dataconnect/generated';
+
+// The `GetUserRoleForClaims` query requires an argument of type `GetUserRoleForClaimsVariables`:
+const getUserRoleForClaimsVars: GetUserRoleForClaimsVariables = {
+  firebaseUID: ..., 
+};
+
+// Call the `getUserRoleForClaims()` function to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await getUserRoleForClaims(getUserRoleForClaimsVars);
+// Variables can be defined inline as well.
+const { data } = await getUserRoleForClaims({ firebaseUID: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await getUserRoleForClaims(dataConnect, getUserRoleForClaimsVars);
+
+console.log(data.users);
+
+// Or, you can use the `Promise` API.
+getUserRoleForClaims(getUserRoleForClaimsVars).then((response) => {
+  const data = response.data;
+  console.log(data.users);
+});
+```
+
+### Using `GetUserRoleForClaims`'s `QueryRef` function
+
+```typescript
+import { getDataConnect, executeQuery } from 'firebase/data-connect';
+import { connectorConfig, getUserRoleForClaimsRef, GetUserRoleForClaimsVariables } from '@dataconnect/generated';
+
+// The `GetUserRoleForClaims` query requires an argument of type `GetUserRoleForClaimsVariables`:
+const getUserRoleForClaimsVars: GetUserRoleForClaimsVariables = {
+  firebaseUID: ..., 
+};
+
+// Call the `getUserRoleForClaimsRef()` function to get a reference to the query.
+const ref = getUserRoleForClaimsRef(getUserRoleForClaimsVars);
+// Variables can be defined inline as well.
+const ref = getUserRoleForClaimsRef({ firebaseUID: ..., });
+
+// You can also pass in a `DataConnect` instance to the `QueryRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = getUserRoleForClaimsRef(dataConnect, getUserRoleForClaimsVars);
 
 // Call `executeQuery()` on the reference to execute the query.
 // You can use the `await` keyword to wait for the promise to resolve.
@@ -8993,10 +9107,11 @@ export interface GetTeachersData {
         status: string;
       } & Subject_Key;
     } & TeacherSubject_Key)[];
-    assignments: ({
+    listAssignments: ({
       id: UUIDString;
       sectionId: UUIDString;
       isClassTeacher: boolean;
+      isActive: boolean;
       section: {
         id: UUIDString;
         name: string;
@@ -9278,24 +9393,6 @@ export interface GetTeachersByWingData {
         status: string;
       } & Subject_Key;
     } & TeacherSubject_Key)[];
-    assignments: ({
-      id: UUIDString;
-      sectionId: UUIDString;
-      isClassTeacher: boolean;
-      section: {
-        id: UUIDString;
-        name: string;
-        academicYear: number;
-        academicClass: {
-          id: UUIDString;
-          name: string;
-          wing: {
-            code: string;
-            name: string;
-          };
-        } & AcademicClass_Key;
-      } & Section_Key;
-    } & TeacherSectionAssignment_Key)[];
   } & Teacher_Key)[];
 }
 ```
@@ -9448,24 +9545,6 @@ export interface GetCoordinatorTeachersByWingData {
         status: string;
       } & Subject_Key;
     } & TeacherSubject_Key)[];
-    assignments: ({
-      id: UUIDString;
-      sectionId: UUIDString;
-      isClassTeacher: boolean;
-      section: {
-        id: UUIDString;
-        name: string;
-        academicYear: number;
-        academicClass: {
-          id: UUIDString;
-          name: string;
-          wing: {
-            code: string;
-            name: string;
-          };
-        } & AcademicClass_Key;
-      } & Section_Key;
-    } & TeacherSectionAssignment_Key)[];
   } & Teacher_Key)[];
 }
 ```
@@ -9627,25 +9706,23 @@ export interface GetTeacherProfileData {
         status: string;
       } & Subject_Key;
     } & TeacherSubject_Key)[];
-    assignments: ({
+    profileAssignments: ({
       id: UUIDString;
       sectionId: UUIDString;
       isClassTeacher: boolean;
       isActive: boolean;
-      createdAt: TimestampString;
-      assignedBy?: {
-        id: UUIDString;
-        fullName: string;
-        role: string;
-      } & User_Key;
       section: {
         id: UUIDString;
         name: string;
         academicYear: number;
-        classTeacherId?: UUIDString | null;
-        students_on_section: ({
+        academicClass: {
           id: UUIDString;
-        } & Student_Key)[];
+          name: string;
+          wing: {
+            code: string;
+            name: string;
+          };
+        } & AcademicClass_Key;
         profileActiveStudents: ({
           id: UUIDString;
           studentId: string;
@@ -9659,19 +9736,6 @@ export interface GetTeacherProfileData {
           status: string;
           markedById: UUIDString;
         } & Attendance_Key)[];
-        classTeacher?: {
-          id: UUIDString;
-          fullName: string;
-          phoneNumber: string;
-        } & User_Key;
-        academicClass: {
-          id: UUIDString;
-          name: string;
-          wing: {
-            code: string;
-            name: string;
-          };
-        } & AcademicClass_Key;
       } & Section_Key;
     } & TeacherSectionAssignment_Key)[];
     attendanceMarked: {
@@ -9810,20 +9874,15 @@ export interface GetTeacherProfileByUserData {
         role: string;
       })[];
     } & User_Key;
-    assignments: ({
+    profileByUserAssignments: ({
       id: UUIDString;
       sectionId: UUIDString;
       isClassTeacher: boolean;
       isActive: boolean;
-      createdAt: TimestampString;
-      assignedBy?: {
-        id: UUIDString;
-        fullName: string;
-        role: string;
-      } & User_Key;
       section: {
         id: UUIDString;
         name: string;
+        academicYear: number;
         academicClass: {
           id: UUIDString;
           name: string;
@@ -9973,7 +10032,7 @@ export interface GetTeacherDashboardData {
         code: string;
       } & Subject_Key;
     } & TeacherSubject_Key)[];
-    assignments: ({
+    dashboardAssignments: ({
       id: UUIDString;
       sectionId: UUIDString;
       isClassTeacher: boolean;
@@ -9982,10 +10041,14 @@ export interface GetTeacherDashboardData {
         id: UUIDString;
         name: string;
         academicYear: number;
-        classTeacherId?: UUIDString | null;
-        students_on_section: ({
+        academicClass: {
           id: UUIDString;
-        } & Student_Key)[];
+          name: string;
+          wing: {
+            code: string;
+            name: string;
+          };
+        } & AcademicClass_Key;
         dashboardActiveStudents: ({
           id: UUIDString;
           studentId: string;
@@ -9999,18 +10062,6 @@ export interface GetTeacherDashboardData {
           status: string;
           markedById: UUIDString;
         } & Attendance_Key)[];
-        classTeacher?: {
-          id: UUIDString;
-          fullName: string;
-        } & User_Key;
-        academicClass: {
-          id: UUIDString;
-          name: string;
-          wing: {
-            code: string;
-            name: string;
-          };
-        } & AcademicClass_Key;
       } & Section_Key;
     } & TeacherSectionAssignment_Key)[];
   } & Teacher_Key;

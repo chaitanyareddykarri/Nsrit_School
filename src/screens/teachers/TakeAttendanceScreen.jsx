@@ -27,7 +27,6 @@ import notificationService from '../../services/notifications/notificationServic
 import {getAccessScope} from '../../services/rbacScope';
 import sectionService from '../../services/sections/sectionService';
 import studentService from '../../services/students/studentService';
-import teacherService from '../../services/teachers/teacherService';
 import academicYearService from '../../services/academicYear/academicYearService';
 import {selectActiveAcademicYear} from '../../store/slices/authSlice';
 import {colors, radius, shadows, spacing, typography} from '../../theme';
@@ -244,7 +243,6 @@ const TakeAttendanceScreen = () => {
   const todayStr = toISODate();
   const role = String(user?.role || '').toUpperCase();
   const isTeachingRole = [USER_ROLES.TEACHER, USER_ROLES.CLASS_TEACHER].includes(role);
-  const isAssignedClassTeacher = isTeachingRole && Boolean(user?.sectionId);
 
   const [selectedClassId,   setSelectedClassId]   = useState('');
   const [selectedSectionId, setSelectedSectionId] = useState('');
@@ -313,35 +311,16 @@ const TakeAttendanceScreen = () => {
   const effectiveReadOnly = isReadOnly || isTimeGated || isSundaySelected || isHolidaySelected;
 
   // ── Class / section queries ───────────────────────────────────────────────
-  const assignmentsQuery = useQuery({
-    queryKey: ['attendanceTeacherAssignments', user?.teacherId, role],
-    queryFn:  () => teacherService.getAssignments({teacherId: user?.teacherId}),
-    enabled:  Boolean(user?.teacherId && isTeachingRole),
-  });
-  const scopedAssignments = useMemo(() => {
-    const all = assignmentsQuery.data || [];
-    return isAssignedClassTeacher ? all.filter(a => a.isClassTeacher) : all;
-  }, [assignmentsQuery.data, isAssignedClassTeacher]);
-
   const classesQuery = useQuery({
     queryKey: ['attendanceClasses', user?.branchId],
     queryFn:  () => classService.getClasses(),
-    enabled:  Boolean(user?.branchId && !isTeachingRole),
+    enabled:  Boolean(user?.branchId),
   });
   const branchClasses = useMemo(
     () => (classesQuery.data || []).filter(c => !c.branchId || c.branchId === user?.branchId),
     [classesQuery.data, user?.branchId],
   );
-  const assignmentClasses = useMemo(() => {
-    const byId = new Map();
-    scopedAssignments.forEach(a => {
-      const cls = a.section?.academicClass;
-      const id  = cls?.id || a.academicClassId;
-      if (id && !byId.has(id)) { byId.set(id, {...cls, id, name: cls?.name || 'Class'}); }
-    });
-    return [...byId.values()];
-  }, [scopedAssignments]);
-  const classes = isTeachingRole ? assignmentClasses : branchClasses;
+  const classes = branchClasses;
 
   useEffect(() => {
     if (!selectedClassId && classes[0]?.id) { setSelectedClassId(classes[0].id); }
@@ -350,23 +329,12 @@ const TakeAttendanceScreen = () => {
   const sectionsQuery = useQuery({
     queryKey: ['attendanceSections', selectedClassId],
     queryFn:  () => sectionService.getSectionsByClass(selectedClassId),
-    enabled:  Boolean(selectedClassId && !isTeachingRole),
+    enabled:  Boolean(selectedClassId),
   });
-  const branchSections = useMemo(
+  const sections = useMemo(
     () => (sectionsQuery.data || []).filter(s => s.isActive !== false),
     [sectionsQuery.data],
   );
-  const assignmentSections = useMemo(
-    () => scopedAssignments
-      .filter(a => {
-        const cid = a.section?.academicClass?.id || a.academicClassId;
-        return !selectedClassId || cid === selectedClassId;
-      })
-      .map(a => ({...a.section, id: a.section?.id || a.sectionId}))
-      .filter(s => s.id),
-    [scopedAssignments, selectedClassId],
-  );
-  const sections = isTeachingRole ? assignmentSections : branchSections;
 
   useEffect(() => {
     if (!sections.some(s => s.id === selectedSectionId)) {
@@ -725,7 +693,6 @@ const TakeAttendanceScreen = () => {
             <EmptyState
               title={isLoading ? 'Loading roster…' : 'No students'}
               message={
-                assignmentsQuery.error?.message ||
                 classesQuery.error?.message ||
                 studentsQuery.error?.message ||
                 'Select a class and section with active students.'

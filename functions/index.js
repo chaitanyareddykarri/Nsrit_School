@@ -1,83 +1,132 @@
 /**
  * Cloud Functions — NSRIT School App
  *
- * setUserClaims: Called from the mobile app after login to stamp the Firebase
- * ID token with { role, branchId } custom claims.  The Storage rules (H-2 fix)
- * rely on these claims to enforce branch-scoped write access.
+ * setUserClaims: Stamps { role, branchId } as Firebase custom claims by
+ * fetching the caller's actual role from DataConnect (Cloud SQL) using admin
+ * credentials.  The client NEVER supplies role or branchId — both come from
+ * the database so privilege escalation via the callable endpoint is impossible.
  *
  * Deploy: firebase deploy --only functions
  */
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const admin = require('firebase-admin');
+const { GoogleAuth } = require('google-auth-library');
 
 admin.initializeApp();
 
-const db = admin.firestore(); // Not used — kept for future use.
+// ── DataConnect config ────────────────────────────────────────────────────────
+
+const PROJECT_ID  = 'nsrit-school-2b749';
+const LOCATION    = 'asia-south1';
+const SERVICE_ID  = 'nsrit-school-2b749-service';
+const CONNECTOR_ID = 'nsrit';
+
+const CONNECTOR_NAME =
+  `projects/${PROJECT_ID}/locations/${LOCATION}/services/${SERVICE_ID}/connectors/${CONNECTOR_ID}`;
+const DATACONNECT_QUERY_URL =
+  `https://firebasedataconnect.googleapis.com/v1/${CONNECTOR_NAME}:executeQuery`;
+
+// Reuse the GoogleAuth client across warm invocations.
+let _googleAuthClient;
+
+async function getAdminAccessToken() {
+  if (!_googleAuthClient) {
+    const auth = new GoogleAuth({
+      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+    });
+    _googleAuthClient = await auth.getClient();
+  }
+  const tokenResponse = await _googleAuthClient.getAccessToken();
+  return tokenResponse.token;
+}
+
+/**
+ * Fetches the caller's role and branchId from Cloud SQL via the DataConnect
+ * REST API using a service-account OAuth2 token.  The query is marked
+ * @auth(level: NO_ACCESS) in the connector, so no client SDK can call it.
+ */
+async function getUserRoleFromDB(firebaseUID) {
+  const accessToken = await getAdminAccessToken();
+
+  const response = await fetch(DATACONNECT_QUERY_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      name: CONNECTOR_NAME,
+      operationName: 'GetUserRoleForClaims',
+      variables: { firebaseUID },
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new HttpsError('internal', `Role lookup failed (${response.status}): ${body}`);
+  }
+
+  const payload = await response.json();
+  if (payload.errors?.length) {
+    throw new HttpsError('internal', payload.errors[0].message);
+  }
+
+  return payload.data?.users?.[0] ?? null;
+}
+
+// ── Role allow-list (normalised to UPPER at stamp time) ───────────────────────
 
 const ALLOWED_ROLES = new Set([
-  'MAIN_ADMIN', 'main_admin',
-  'BRANCH_ADMIN', 'branch_admin',
-  'PRINCIPAL', 'principal',
-  'COORDINATOR', 'coordinator',
-  'TEACHER', 'teacher',
-  'CLASS_TEACHER', 'class_teacher',
-  'ACCOUNTANT', 'accountant',
-  'PARENT', 'parent',
+  'MAIN_ADMIN',
+  'BRANCH_ADMIN',
+  'PRINCIPAL',
+  'COORDINATOR',
+  'TEACHER',
+  'CLASS_TEACHER',
+  'ACCOUNTANT',
+  'PARENT',
 ]);
+
+// ── Cloud Function ────────────────────────────────────────────────────────────
 
 /**
  * setUserClaims — stamps { role, branchId } onto the caller's Firebase token.
  *
- * Called once per login session (after OTP verification + DataConnect profile
- * fetch) so that Firebase Storage rules can evaluate role/branch without an
- * extra network call to DataConnect.
- *
  * Security model:
- *   - The caller MUST be authenticated (auth context is verified by Firebase).
- *   - role and branchId come from the DataConnect profile that was already
- *     server-validated at login (auth.uid == profile.firebaseUID @check).
- *   - We never accept a role that isn't in the allow-list.
- *   - We never allow the client to escalate to MAIN_ADMIN if the token doesn't
- *     already carry that claim (prevents privilege escalation on re-calls).
+ *   - Caller must be authenticated (enforced by Firebase).
+ *   - App Check is enforced (blocks calls from non-app clients / emulators).
+ *   - role and branchId come ONLY from the DataConnect database — the client
+ *     sends no role data.  This eliminates the privilege-escalation vector
+ *     where a client could self-assign a higher role.
  */
 exports.setUserClaims = onCall({ enforceAppCheck: true }, async (request) => {
-  const { role, branchId } = request.data || {};
-
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Authentication required.');
   }
 
   const uid = request.auth.uid;
-  const normalizedRole = String(role || '').toUpperCase();
 
-  if (!ALLOWED_ROLES.has(normalizedRole) && !ALLOWED_ROLES.has(role)) {
-    throw new HttpsError('invalid-argument', 'Unknown role.');
+  // Server-side verification: fetch the user's actual role from the database.
+  const dbUser = await getUserRoleFromDB(uid);
+
+  if (!dbUser || dbUser.isActive === false) {
+    throw new HttpsError('not-found', 'User profile not found or inactive.');
   }
 
-  // Prevent a non-admin from claiming MAIN_ADMIN via this endpoint.
-  const existing = request.auth.token;
-  const existingRole = String(existing?.role || '').toUpperCase();
-  if (
-    normalizedRole === 'MAIN_ADMIN' &&
-    existingRole !== 'MAIN_ADMIN' &&
-    existingRole !== 'MAIN_ADMIN'.toLowerCase()
-  ) {
-    // Only allow MAIN_ADMIN claim if the token already carries it
-    // (i.e., it was set by a previous privileged call, not self-assigned).
-    throw new HttpsError(
-      'permission-denied',
-      'Cannot self-assign MAIN_ADMIN role.',
-    );
+  const role = String(dbUser.role ?? '').toUpperCase();
+
+  if (!ALLOWED_ROLES.has(role)) {
+    throw new HttpsError('invalid-argument', `Unknown role: ${role}`);
   }
 
-  const claims = { role: normalizedRole };
-  if (branchId) {
-    claims.branchId = branchId;
+  const claims = { role };
+  if (dbUser.branchId) {
+    claims.branchId = dbUser.branchId;
   }
 
   await admin.auth().setCustomUserClaims(uid, claims);
 
-  // Return success — the client must force-refresh the token to pick up new claims.
+  // The client must force-refresh its ID token to pick up the new claims.
   return { success: true };
 });

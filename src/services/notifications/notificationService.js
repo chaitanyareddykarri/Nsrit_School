@@ -5,6 +5,26 @@ import {DATA_CONNECT_MUTATIONS, DATA_CONNECT_QUERIES} from '../dataconnect/opera
 const formatAmount = value =>
   Number(value || 0).toLocaleString('en-IN', {maximumFractionDigits: 2});
 
+// ── Broadcast rate limiter ────────────────────────────────────────────────────
+// Keyed by `${branchId}:${senderId}` → array of timestamps within the window.
+// Resets on process restart (in-memory only, sufficient for per-session abuse).
+const _broadcastLog = new Map();
+const BROADCAST_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const BROADCAST_LIMIT = 3;
+
+const checkBroadcastRateLimit = (branchId, senderId) => {
+  const key = `${branchId}:${senderId || 'unknown'}`;
+  const now = Date.now();
+  const recent = (_broadcastLog.get(key) || []).filter(t => now - t < BROADCAST_WINDOW_MS);
+  if (recent.length >= BROADCAST_LIMIT) {
+    throw new Error(
+      `Broadcast limit reached. Maximum ${BROADCAST_LIMIT} broadcasts per hour per branch.`,
+    );
+  }
+  recent.push(now);
+  _broadcastLog.set(key, recent);
+};
+
 export const notificationService = {
   async getNotifications({userId, limit = 30, offset = 0}) {
     try {
@@ -72,6 +92,7 @@ export const notificationService = {
   // Returns {sent, failed} counts.
   async broadcastNotification({branchId, title, message, target = 'all', senderId = null, senderName = null, senderRole = null}) {
     if (!branchId) {throw new Error('branchId required for broadcast');}
+    checkBroadcastRateLimit(branchId, senderId);
     const userIds = new Set();
 
     // Sender always receives their own broadcast so it appears in their Notification Center.

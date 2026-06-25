@@ -25,7 +25,7 @@ if (__DEV__ && (USE_EMULATOR || USE_AUTH_EMULATOR)) {
 
 import dataConnectClient from '../dataconnect/dataConnectClient';
 import {DATA_CONNECT_MUTATIONS, DATA_CONNECT_QUERIES} from '../dataconnect/operations';
-import {getJSON, removeStorageKeys, setJSON, storage} from '../storage/mmkvStorage';
+import {getJSON, removeStorageKeys, setJSON} from '../storage/mmkvStorage';
 import {errorResponse, successResponse} from '../../utils/firebaseResponse';
 import {formatE164PhoneNumber} from '../../utils/phone';
 import {USER_ROLES, USER_ROLE_PRIORITY} from '../../config/constants';
@@ -250,7 +250,12 @@ const hydrateRoleProfile = async (profile, preferredRole) => {
 
   if (role === USER_ROLES.TEACHER || role === USER_ROLES.CLASS_TEACHER) {
     const teacher = await teacherService.getTeacherProfileByUser(profile.id);
-    const assignments = teacher?.assignments || teacher?.teacherSectionAssignments_on_teacher || [];
+    const assignments =
+      teacher?.profileByUserAssignments ||
+      teacher?.profileAssignments ||
+      teacher?.assignments ||
+      teacher?.teacherSectionAssignments_on_teacher ||
+      [];
     const classTeacherAssignment = assignments.find(item => item.isClassTeacher && item.isActive !== false);
     const classTeacherSection = classTeacherAssignment?.section;
     return {
@@ -332,9 +337,6 @@ export const authService = {
       const fullPhoneNumber =
         credentialUser.phoneNumber || buildFullPhoneNumber({countryCode, phoneNumber});
       logger.log('[Auth] Full phone number:', fullPhoneNumber);
-
-      // Store token immediately so DataConnect has auth for subsequent queries.
-      storage.set(STORAGE_KEYS.AUTH_TOKEN, token);
 
       // ── Step 1: find profile by Firebase UID ─────────────────────────────
       logger.log('[Auth] fetchUserProfile by UID:', credentialUser.uid);
@@ -418,7 +420,7 @@ export const authService = {
 
       // H-2 fix: stamp { role, branchId } as custom claims so Firebase Storage
       // rules can enforce branch-scoped write access without a DataConnect call.
-      await stampUserClaims({role: user.role, branchId: user.branchId});
+      await stampUserClaims();
 
       return successResponse({user, token, needsRoleSelection: false}, 'Login successful');
 
@@ -462,11 +464,7 @@ export const authService = {
 
     logger.log('[Auth] selectRole complete — userId:', user.id, 'role:', user.role);
     setJSON(STORAGE_KEYS.AUTH_USER, user);
-    if (token) {
-      storage.set(STORAGE_KEYS.AUTH_TOKEN, token);
-    }
-    // H-2 fix: keep custom claims in sync after role selection.
-    await stampUserClaims({role: user.role, branchId: user.branchId});
+    await stampUserClaims();
     return {token, user};
   },
 
@@ -489,7 +487,6 @@ export const authService = {
     const authInstance = getAuth();
     await signOut(authInstance);
     removeStorageKeys([
-      STORAGE_KEYS.AUTH_TOKEN,
       STORAGE_KEYS.AUTH_USER,
       STORAGE_KEYS.OTP_VERIFICATION_ID,
       STORAGE_KEYS.MAIN_ADMIN_BRANCH_CONTEXT,
@@ -502,7 +499,6 @@ export const authService = {
     const authInstance = getAuth();
     await signOut(authInstance);
     removeStorageKeys([
-      STORAGE_KEYS.AUTH_TOKEN,
       STORAGE_KEYS.AUTH_USER,
       STORAGE_KEYS.OTP_VERIFICATION_ID,
     ]);
@@ -538,7 +534,7 @@ export const authService = {
         // between OTP and role pick). Force a fresh login to re-show the picker.
         if (!preferredRole) {
           logger.warn('[Auth] getStoredSession — no active role in stored session; clearing.');
-          removeStorageKeys([STORAGE_KEYS.AUTH_TOKEN, STORAGE_KEYS.AUTH_USER]);
+          removeStorageKeys([STORAGE_KEYS.AUTH_USER]);
           return null;
         }
 
@@ -550,7 +546,6 @@ export const authService = {
           });
           logger.log('[Auth] getStoredSession — session restored, role:', user.role);
           setJSON(STORAGE_KEYS.AUTH_USER, user);
-          storage.set(STORAGE_KEYS.AUTH_TOKEN, token);
           return {token, user};
         }
       } catch (error) {
@@ -560,7 +555,7 @@ export const authService = {
 
     if (storedUser) {
       logger.warn('[Auth] getStoredSession — no Firebase user; clearing stored session.');
-      removeStorageKeys([STORAGE_KEYS.AUTH_TOKEN, STORAGE_KEYS.AUTH_USER]);
+      removeStorageKeys([STORAGE_KEYS.AUTH_USER]);
     }
     return null;
   },
@@ -605,11 +600,7 @@ export const authService = {
 
     logger.log('[Auth] switchRole complete — new role:', user.role);
     setJSON(STORAGE_KEYS.AUTH_USER, user);
-    if (token) {
-      storage.set(STORAGE_KEYS.AUTH_TOKEN, token);
-    }
-    // H-2 fix: keep custom claims in sync after role switch.
-    await stampUserClaims({role: user.role, branchId: user.branchId});
+    await stampUserClaims();
     return {token, user};
   },
 };

@@ -127,9 +127,15 @@ const flattenTeacher = teacher => {
       (teacher.subjects || teacher.teacherSubjects_on_teacher || [])
         .map(item => item.subject)
         .filter(Boolean) || [],
-    assignments: (teacher.assignments || teacher.teacherSectionAssignments_on_teacher || []).filter(
-      item => item.isActive !== false,
-    ),
+    assignments: (
+      teacher.profileAssignments ||
+      teacher.listAssignments ||
+      teacher.profileByUserAssignments ||
+      teacher.dashboardAssignments ||
+      teacher.assignments ||
+      teacher.teacherSectionAssignments_on_teacher ||
+      []
+    ).filter(item => item.isActive !== false),
     attendanceMarked:
       teacher.attendanceMarked?.attendances_on_markedBy ||
       teacher.attendanceMarked?.profileMarkedAttendance ||

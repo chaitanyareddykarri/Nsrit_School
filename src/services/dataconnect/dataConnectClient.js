@@ -1,7 +1,7 @@
 import {getAuth, getIdToken, onAuthStateChanged} from '@react-native-firebase/auth';
 import {STORAGE_KEYS, USER_ROLES} from '../../config/constants';
 import {dataConnectConfig, firebaseConfig} from '../../config/env';
-import {getJSON, storage} from '../storage/mmkvStorage';
+import {getJSON} from '../storage/mmkvStorage';
 import {getMainAdminBranchContext} from '../mainAdmin/mainAdminContextService';
 import logger from '../../utils/logger';
 
@@ -40,15 +40,9 @@ const waitForCurrentUser = authInstance => {
 const getAuthToken = async () => {
   const authInstance = getAuth();
   const currentUser = await waitForCurrentUser(authInstance);
-
-  if (!currentUser) {
-    storage.delete(STORAGE_KEYS.AUTH_TOKEN);
-    return null;
-  }
-
-  const token = await getIdToken(currentUser);
-  storage.set(STORAGE_KEYS.AUTH_TOKEN, token);
-  return token;
+  if (!currentUser) return null;
+  // Let @react-native-firebase/auth manage token caching and refresh internally.
+  return getIdToken(currentUser);
 };
 
 const AUDIT_OPERATION = 'RecordAuditLog';
@@ -225,7 +219,6 @@ const executeConnectorOperation = async ({
     if (currentUser) {
       try {
         const freshToken = await getIdToken(currentUser, true);
-        storage.set(STORAGE_KEYS.AUTH_TOKEN, freshToken);
         return executeConnectorOperation({
           operationName,
           variables,

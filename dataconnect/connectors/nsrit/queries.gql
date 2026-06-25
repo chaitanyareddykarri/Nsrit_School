@@ -121,6 +121,17 @@ query GetUserByPhone($phoneNumber: String!) @auth(level: USER) {
   }
 }
 
+# Called only by the setUserClaims Cloud Function via service-account credentials.
+# @auth(level: NO_ACCESS) prevents any client SDK from invoking this directly;
+# service-account / Admin SDK calls bypass auth level restrictions entirely.
+query GetUserRoleForClaims($firebaseUID: String!) @auth(level: NO_ACCESS) {
+  users(where: {firebaseUID: {eq: $firebaseUID}, isActive: {eq: true}}, limit: 1) {
+    role
+    branchId
+    isActive
+  }
+}
+
 query GetUserRoles($userId: UUID!) @auth(level: USER) {
   currentUser: users(
     where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
@@ -2833,7 +2844,7 @@ query GetTeachers($branchId: UUID!, $limit: Int = 50, $offset: Int = 0) @auth(le
         status
       }
     }
-    assignments: teacherSectionAssignments_on_teacher(where: {isActive: {eq: true}}) {
+    listAssignments: teacherSectionAssignments_on_teacher(where: {isActive: {eq: true}}) {
       id
       sectionId
       isClassTeacher
@@ -2919,25 +2930,6 @@ query GetTeachersByWing($branchId: UUID!, $wing: String!, $limit: Int = 50, $off
         status
       }
     }
-    assignments: teacherSectionAssignments_on_teacher(where: {isActive: {eq: true}}) {
-      id
-      sectionId
-      isClassTeacher
-      isActive
-      section {
-        id
-        name
-        academicYear
-        academicClass {
-          id
-          name
-          wing {
-            code
-            name
-          }
-        }
-      }
-    }
   }
 }
 
@@ -2986,25 +2978,6 @@ query GetCoordinatorTeachersByWing($branchId: UUID!, $wing: String!, $limit: Int
         name
         code
         status
-      }
-    }
-    assignments: teacherSectionAssignments_on_teacher(where: {isActive: {eq: true}}) {
-      id
-      sectionId
-      isClassTeacher
-      isActive
-      section {
-        id
-        name
-        academicYear
-        academicClass {
-          id
-          name
-          wing {
-            code
-            name
-          }
-        }
       }
     }
   }
@@ -3066,24 +3039,22 @@ query GetTeacherProfile($teacherId: UUID!) @auth(level: USER) {
         status
       }
     }
-    assignments: teacherSectionAssignments_on_teacher(where: {isActive: {eq: true}}) {
+    profileAssignments: teacherSectionAssignments_on_teacher(where: {isActive: {eq: true}}) {
       id
       sectionId
       isClassTeacher
       isActive
-      createdAt
-      assignedBy {
-        id
-        fullName
-        role
-      }
       section {
         id
         name
         academicYear
-        classTeacherId
-        students_on_section {
+        academicClass {
           id
+          name
+          wing {
+            code
+            name
+          }
         }
         profileActiveStudents: students_on_section(where: {status: {eq: "ACTIVE"}, isActive: {eq: true}}, limit: 500) {
           id
@@ -3097,19 +3068,6 @@ query GetTeacherProfile($teacherId: UUID!) @auth(level: USER) {
           attendanceDate
           status
           markedById
-        }
-        classTeacher {
-          id
-          fullName
-          phoneNumber
-        }
-        academicClass {
-          id
-          name
-          wing {
-            code
-            name
-          }
         }
       }
     }
@@ -3174,20 +3132,15 @@ query GetTeacherProfileByUser($userId: UUID!) @auth(level: USER) {
         role
       }
     }
-    assignments: teacherSectionAssignments_on_teacher(where: {isActive: {eq: true}}) {
+    profileByUserAssignments: teacherSectionAssignments_on_teacher(where: {isActive: {eq: true}}) {
       id
       sectionId
       isClassTeacher
       isActive
-      createdAt
-      assignedBy {
-        id
-        fullName
-        role
-      }
       section {
         id
         name
+        academicYear
         academicClass {
           id
           name
@@ -3239,7 +3192,7 @@ query GetTeacherDashboard($teacherId: UUID!) @auth(level: USER) {
         code
       }
     }
-    assignments: teacherSectionAssignments_on_teacher(where: {isActive: {eq: true}}) {
+    dashboardAssignments: teacherSectionAssignments_on_teacher(where: {isActive: {eq: true}}) {
       id
       sectionId
       isClassTeacher
@@ -3248,9 +3201,13 @@ query GetTeacherDashboard($teacherId: UUID!) @auth(level: USER) {
         id
         name
         academicYear
-        classTeacherId
-        students_on_section {
+        academicClass {
           id
+          name
+          wing {
+            code
+            name
+          }
         }
         dashboardActiveStudents: students_on_section(where: {status: {eq: "ACTIVE"}, isActive: {eq: true}}, limit: 500) {
           id
@@ -3264,18 +3221,6 @@ query GetTeacherDashboard($teacherId: UUID!) @auth(level: USER) {
           attendanceDate
           status
           markedById
-        }
-        classTeacher {
-          id
-          fullName
-        }
-        academicClass {
-          id
-          name
-          wing {
-            code
-            name
-          }
         }
       }
     }
