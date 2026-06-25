@@ -1,0 +1,5090 @@
+mutation CreateBranch(
+  $name: String!
+  $branchCode: String!
+  $address: String
+  $city: String
+  $state: String
+  $pincode: String
+  $phone: String
+  $email: String
+  $status: String = "ACTIVE"
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Main Admin required") {
+      id
+      role
+    }
+    existingBranches: branches(
+      where: {branchCode: {eq: $branchCode}}
+      limit: 1
+    ) @check(expr: "!this.exists(b, true)", message: "Branch code already exists") {
+      id
+    }
+  }
+  branch_insert(
+    data: {
+      name: $name
+      branchCode: $branchCode
+      address: $address
+      city: $city
+      state: $state
+      pincode: $pincode
+      phone: $phone
+      email: $email
+      status: $status
+      isActive: true
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation UpdateBranch(
+  $id: UUID!
+  $name: String!
+  $address: String
+  $city: String
+  $state: String
+  $pincode: String
+  $phone: String
+  $email: String
+  $status: String!
+  $isActive: Boolean!
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Main Admin required") {
+      id
+      role
+    }
+  }
+  branch_update(
+    id: $id
+    data: {
+      name: $name
+      address: $address
+      city: $city
+      state: $state
+      pincode: $pincode
+      phone: $phone
+      email: $email
+      status: $status
+      isActive: $isActive
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation AssignBranchAdmin($branchId: UUID!, $branchAdminId: UUID!) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Main Admin required") {
+      id
+      role
+    }
+  }
+  branch_update(
+    id: $branchId
+    data: {
+      branchAdmin: {id: $branchAdminId}
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation AssignPrincipal(
+  $branchId: UUID!
+  $principalId: UUID!
+  $employeeId: String!
+  $joiningYear: Int!
+  $branchCode: String!
+  $serialNumber: Int!
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Main Admin required") {
+      id
+      role
+    }
+  }
+  employeeSequence_upsert(
+    data: {
+      year: $joiningYear
+      branchCode: $branchCode
+      staffType: "TEACHING"
+      lastSequence: $serialNumber
+      updatedAt_expr: "request.time"
+    }
+  )
+  staffIdSequence_upsert(
+    data: {
+      joiningYear: $joiningYear
+      branchCode: $branchCode
+      staffType: "TEACHING"
+      lastSerialNumber: $serialNumber
+      updatedAt_expr: "request.time"
+    }
+  )
+  user_update(
+    id: $principalId
+    data: {
+      employeeId: $employeeId
+      staffType: "TEACHING"
+      updatedAt_expr: "request.time"
+    }
+  )
+  branch_update(
+    id: $branchId
+    data: {
+      principal: {id: $principalId}
+      updatedAt_expr: "request.time"
+    }
+  )
+  auditLog_insert(
+    data: {
+      performedBy_expr: "response.query.users[0].id"
+      performedRole_expr: "response.query.users[0].role"
+      action: "STAFF_CREATED"
+      entityType: "STAFF"
+      entityId: $employeeId
+      branchId: $branchId
+      newData: "Principal teaching staff created"
+    }
+  )
+}
+
+mutation CreateClass($branchId: UUID!, $wingId: UUID!, $name: String!, $displayOrder: Int) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Class creation access required") {
+      id
+      role
+      branchId
+    }
+  }
+  academicClass_insert(
+    data: {
+      branch: {id: $branchId}
+      wing: {id: $wingId}
+      name: $name
+      displayOrder: $displayOrder
+      isActive: true
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+
+mutation ActivateClass($classId: UUID!) @auth(level: USER) {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Principal required") {
+      id
+      role
+    }
+  }
+  academicClass_update(
+    id: $classId
+    data: {
+      isActive: true
+      activatedById_expr: "response.query.users[0].id"
+      activatedAt_expr: "request.time"
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation DeactivateClass($classId: UUID!) @auth(level: USER) {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Principal required") {
+      id
+      role
+    }
+  }
+  academicClass_update(
+    id: $classId
+    data: {
+      isActive: false
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation SeedAcademicClass(
+  $branchId: UUID!,
+  $wingId: UUID!,
+  $name: String!,
+  $classCode: String!,
+  $sortOrder: Int!,
+  $isActive: Boolean!
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Branch leadership required to seed classes") {
+      id
+      role
+      branchId
+    }
+  }
+  academicClass_insert(
+    data: {
+      branch: {id: $branchId}
+      wing: {id: $wingId}
+      name: $name
+      classCode: $classCode
+      sortOrder: $sortOrder
+      isActive: $isActive
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation CreateWing($branchId: UUID!, $name: String!, $code: String!) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Branch leadership required") {
+      id
+      role
+      branchId
+    }
+  }
+  wing_insert(
+    data: {
+      branch: {id: $branchId}
+      name: $name
+      code: $code
+      isActive: true
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation CreateSection(
+  $branchId: UUID!
+  $wingId: UUID!
+  $academicClassId: UUID!
+  $name: String!
+  $academicYear: Int! = 2026
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Section creation access required") {
+      id
+      role
+      branchId
+    }
+  }
+  section_insert(
+    data: {
+      branch: {id: $branchId}
+      wing: {id: $wingId}
+      academicClass: {id: $academicClassId}
+      name: $name
+      academicYear: $academicYear
+      isActive: true
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation RemoveSection($id: UUID!) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Section removal access required") {
+      id
+      role
+    }
+  }
+  section_update(id: $id, data: {isActive: false, updatedAt_expr: "request.time"})
+}
+
+mutation CreateUser(
+  $firebaseUID: String!
+  $fullName: String!
+  $countryCode: String!
+  $phoneNumber: String!
+  $role: String!
+  $employeeId: String
+  $staffType: String
+  $branchId: UUID
+  $wingId: UUID
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "User creation access required") {
+      id
+      role
+    }
+  }
+  user_insert(
+    data: {
+      firebaseUID: $firebaseUID
+      fullName: $fullName
+      countryCode: $countryCode
+      phoneNumber: $phoneNumber
+      status: "ACTIVE"
+      role: $role
+      employeeId: $employeeId
+      staffType: $staffType
+      branch: {id: $branchId}
+      wing: {id: $wingId}
+      isActive: true
+      updatedAt_expr: "request.time"
+    }
+  )
+  userRole_upsert(
+    data: {
+      userId_expr: "response.user_insert.id"
+      role: $role
+    }
+  )
+}
+
+mutation ClaimUserFirebaseUID($id: UUID!) @auth(level: USER) @transaction {
+  query @redact {
+    # Prevent duplicate claims: block if another active account already owns this Firebase UID
+    duplicateClaim: users(
+      where: {firebaseUID: {eq_expr: "auth.uid"}, id: {ne: $id}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "!this.exists(u, true)", message: "This Firebase account is already linked to another user record") {
+      id
+    }
+    # Ensure the target user record exists and is active
+    targetUser: users(
+      where: {id: {eq: $id}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Target user account not found") {
+      id
+    }
+  }
+  user_update(
+    id: $id
+    data: {
+      firebaseUID_expr: "auth.uid"
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation EnsureCurrentUserLegacyRole @auth(level: USER) @transaction {
+  query @redact {
+    currentUser: users(
+      where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Authenticated user required") {
+      id
+      role
+    }
+  }
+  # Upsert the current primary role only. Does NOT delete other entries.
+  # user_roles is managed exclusively through the ChangeUserRoleScreen admin
+  # tool (SetUserRoles / AddAdditionalRole). Keeping upsert-only here means
+  # multi-role assignments survive every login.
+  userRole_upsert(
+    data: {
+      userId_expr: "response.query.currentUser[0].id"
+      role_expr: "response.query.currentUser[0].role"
+    }
+  )
+}
+
+mutation AddParentRole($userId: UUID!, $branchId: UUID) @auth(level: USER) @transaction {
+  query @redact {
+    currentUser: users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Parent role assignment denied") {
+      id
+      role
+      branchId
+    }
+  }
+  userRole_upsert(
+    data: {
+      user: {id: $userId}
+      role: "PARENT"
+    }
+  )
+  auditLog_insert(
+    data: {
+      user: {id: $userId}
+      performedBy_expr: "response.query.currentUser[0].id"
+      performedRole_expr: "response.query.currentUser[0].role"
+      action: "ROLE_ADDED"
+      entityType: "USER_ROLE"
+      entityId_expr: "vars.userId"
+      branchId: $branchId
+      newRole: "PARENT"
+      newData: "Parent role added"
+    }
+  )
+}
+
+mutation SwitchRole($userId: UUID!, $oldRole: String!, $newRole: String!) @auth(level: USER) @transaction {
+  query @redact {
+    currentUser: users(
+      where: {id: {eq: $userId}, firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Role switch denied") {
+      id
+      role
+    }
+    selectedRole: userRoles(
+      where: {userId: {eq: $userId}, role: {eq: $newRole}}
+      limit: 1
+    ) @check(expr: "this.exists(r, true)", message: "Role is not assigned to this user") {
+      id
+      role
+    }
+  }
+  user_update(
+    id: $userId
+    data: {
+      role: $newRole
+      updatedAt_expr: "request.time"
+    }
+  )
+  auditLog_insert(
+    data: {
+      user: {id: $userId}
+      performedBy_expr: "response.query.currentUser[0].id"
+      performedRole: $oldRole
+      actingAs: $newRole
+      action: "ROLE_SWITCHED"
+      entityType: "USER"
+      entityId_expr: "vars.userId"
+      oldRole: $oldRole
+      newRole: $newRole
+      oldData: $oldRole
+      newData: $newRole
+    }
+  )
+}
+
+mutation LinkParentUser($parentId: UUID!, $userId: UUID!, $branchId: UUID) @auth(level: USER) @transaction {
+  query @redact {
+    # Only MAIN_ADMIN, BRANCH_ADMIN, or PRINCIPAL can link parent accounts
+    callerUser: users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Only administrators can link parent accounts") {
+      id
+      role
+    }
+  }
+  parent_update(
+    id: $parentId
+    data: {
+      user: {id: $userId}
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+
+mutation LinkStudentParent(
+  $studentId: UUID!
+  $userId: UUID!
+  $relationship: String!
+  $branchId: UUID!
+) @auth(level: USER) @transaction {
+  query @redact {
+    currentUser: users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Student parent linking denied") {
+      id
+      role
+      branchId
+    }
+    selectedStudent: students(
+      where: {id: {eq: $studentId}, branchId: {eq: $branchId}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(s, true)", message: "Student not found in branch") {
+      id
+      studentId
+    }
+  }
+  studentParent_upsert(
+    data: {
+      student: {id: $studentId}
+      user: {id: $userId}
+      relationship: $relationship
+    }
+  )
+  auditLog_insert(
+    data: {
+      user: {id: $userId}
+      performedBy_expr: "response.query.currentUser[0].id"
+      performedRole_expr: "response.query.currentUser[0].role"
+      action: "STUDENT_PARENT_LINKED"
+      entityType: "STUDENT_PARENT"
+      entityId_expr: "response.query.selectedStudent[0].studentId"
+      branchId: $branchId
+      newData: $relationship
+    }
+  )
+}
+
+mutation CreateParent(
+  $userId: UUID
+  $branchId: UUID!
+  $fullName: String!
+  $fatherName: String
+  $motherName: String
+  $countryCode: String!
+  $phoneNumber: String!
+  $address: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Parent creation access required") {
+      id
+      role
+      branchId
+    }
+  }
+  userRole_upsert(
+    data: {
+      user: {id: $userId}
+      role: "PARENT"
+    }
+  )
+  parent_insert(
+    data: {
+      user: {id: $userId}
+      branch: {id: $branchId}
+      fullName: $fullName
+      fatherName: $fatherName
+      motherName: $motherName
+      countryCode: $countryCode
+      phoneNumber: $phoneNumber
+      address: $address
+      isActive: true
+      updatedAt_expr: "request.time"
+    }
+  )
+  auditLog_insert(
+    data: {
+      user: {id: $userId}
+      performedBy_expr: "response.query.users[0].id"
+      performedRole_expr: "response.query.users[0].role"
+      action: "PARENT_LINKED"
+      entityType: "PARENT"
+      entityId_expr: "response.parent_insert.id"
+      branchId: $branchId
+      newRole: "PARENT"
+      newData: "Parent profile linked"
+    }
+  )
+}
+
+mutation CreateParentWithoutUser(
+  $firebaseUID: String
+  $branchId: UUID!
+  $fullName: String!
+  $fatherName: String
+  $motherName: String
+  $countryCode: String!
+  $phoneNumber: String!
+  $address: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Parent creation access required") {
+      id
+      role
+      branchId
+    }
+  }
+  user_insert(
+    data: {
+      firebaseUID: $firebaseUID
+      fullName: $fullName
+      countryCode: $countryCode
+      phoneNumber: $phoneNumber
+      status: "ACTIVE"
+      role: "PARENT"
+      branch: {id: $branchId}
+      isActive: true
+      updatedAt_expr: "request.time"
+    }
+  )
+  userRole_upsert(
+    data: {
+      userId_expr: "response.user_insert.id"
+      role: "PARENT"
+    }
+  )
+  parent_insert(
+    data: {
+      userId_expr: "response.user_insert.id"
+      branch: {id: $branchId}
+      fullName: $fullName
+      fatherName: $fatherName
+      motherName: $motherName
+      countryCode: $countryCode
+      phoneNumber: $phoneNumber
+      address: $address
+      isActive: true
+      updatedAt_expr: "request.time"
+    }
+  )
+  auditLog_insert(
+    data: {
+      userId_expr: "response.user_insert.id"
+      performedBy_expr: "response.query.users[0].id"
+      performedRole_expr: "response.query.users[0].role"
+      action: "PARENT_LINKED"
+      entityType: "PARENT"
+      entityId_expr: "response.parent_insert.id"
+      branchId: $branchId
+      newRole: "PARENT"
+      newData: "Parent user and profile created"
+    }
+  )
+}
+
+mutation CreateStudent(
+  $studentId: String!
+  $admissionYear: Int!
+  $branchCode: String!
+  $serialNumber: Int!
+  $fullName: String!
+  $gender: String
+  $dateOfBirth: Date
+  $photoUrl: String
+  $aadhaarNumber: String
+  $bloodGroup: String
+  $branchId: UUID!
+  $wingId: UUID
+  $wingCode: String
+  $academicClassId: UUID!
+  $sectionId: UUID!
+  $parentId: UUID!
+  $countryCode: String
+  $phoneNumber: String
+  $address: String
+  $city: String
+  $state: String
+  $pincode: String
+  $emergencyContact: String
+  $transportRequired: Boolean
+  $admissionDate: Date!
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Student creation access denied") {
+      id
+      role
+      branchId
+    }
+    selectedClass: academicClasses(
+      where: {id: {eq: $academicClassId}, branchId: {eq: $branchId}, wingId: {eq: $wingId}, wing: {code: {eq: $wingCode}}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(c, true)", message: "Selected class is not active for this branch") {
+      id
+      wingId
+    }
+    selectedSection: sections(
+      where: {id: {eq: $sectionId}, branchId: {eq: $branchId}, academicClassId: {eq: $academicClassId}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(s, true)", message: "Selected section is not active for this class") {
+      id
+    }
+  }
+  studentIdSequence_upsert(
+    data: {
+      admissionYear: $admissionYear
+      branchCode: $branchCode
+      lastSerialNumber: $serialNumber
+      updatedAt_expr: "request.time"
+    }
+  )
+  studentSequence_upsert(
+    data: {
+      year: $admissionYear
+      branchCode: $branchCode
+      lastSerial: $serialNumber
+      updatedAt_expr: "request.time"
+    }
+  )
+  student_insert(
+    data: {
+      studentId: $studentId
+      admissionYear: $admissionYear
+      branchCode: $branchCode
+      serialNumber: $serialNumber
+      fullName: $fullName
+      gender: $gender
+      dateOfBirth: $dateOfBirth
+      photoUrl: $photoUrl
+      aadhaarNumber: $aadhaarNumber
+      bloodGroup: $bloodGroup
+      branch: {id: $branchId}
+      wing: {id: $wingId}
+      academicClass: {id: $academicClassId}
+      section: {id: $sectionId}
+      parent: {id: $parentId}
+      countryCode: $countryCode
+      phoneNumber: $phoneNumber
+      address: $address
+      city: $city
+      state: $state
+      pincode: $pincode
+      emergencyContact: $emergencyContact
+      transportRequired: $transportRequired
+      admissionDate: $admissionDate
+      status: "ACTIVE"
+      isActive: true
+      updatedAt_expr: "request.time"
+    }
+  )
+  auditLog_insert(
+    data: {
+      performedBy_expr: "response.query.users[0].id"
+      performedRole_expr: "response.query.users[0].role"
+      action: "STUDENT_CREATED"
+      entityType: "STUDENT"
+      entityId: $studentId
+      branchId: $branchId
+      newData: "Student created"
+    }
+  )
+}
+
+mutation UpdateStudent(
+  $studentId: UUID!
+  $parentId: UUID!
+  $branchId: UUID!
+  $fullName: String!
+  $gender: String
+  $dateOfBirth: Date
+  $photoUrl: String
+  $aadhaarNumber: String
+  $bloodGroup: String
+  $academicClassId: UUID!
+  $sectionId: UUID!
+  $countryCode: String
+  $phoneNumber: String
+  $address: String
+  $city: String
+  $state: String
+  $pincode: String
+  $emergencyContact: String
+  $transportRequired: Boolean
+  $admissionDate: Date!
+  $fatherName: String
+  $motherName: String
+  $parentPhoneNumber: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Student update access denied") {
+      id
+      role
+      branchId
+    }
+    selectedStudent: students(
+      where: {id: {eq: $studentId}, branchId: {eq: $branchId}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(s, true)", message: "Student not found in branch") {
+      id
+    }
+    selectedClass: academicClasses(
+      where: {id: {eq: $academicClassId}, branchId: {eq: $branchId}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(c, true)", message: "Selected class is not active for this branch") {
+      id
+    }
+    selectedSection: sections(
+      where: {id: {eq: $sectionId}, branchId: {eq: $branchId}, academicClassId: {eq: $academicClassId}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(s, true)", message: "Selected section is not active for this class") {
+      id
+    }
+  }
+  student_update(
+    id: $studentId
+    data: {
+      fullName: $fullName
+      gender: $gender
+      dateOfBirth: $dateOfBirth
+      photoUrl: $photoUrl
+      aadhaarNumber: $aadhaarNumber
+      bloodGroup: $bloodGroup
+      academicClass: {id: $academicClassId}
+      section: {id: $sectionId}
+      countryCode: $countryCode
+      phoneNumber: $phoneNumber
+      address: $address
+      city: $city
+      state: $state
+      pincode: $pincode
+      emergencyContact: $emergencyContact
+      transportRequired: $transportRequired
+      admissionDate: $admissionDate
+      updatedAt_expr: "request.time"
+    }
+  )
+  parent_update(
+    id: $parentId
+    data: {
+      fullName: $fatherName
+      fatherName: $fatherName
+      motherName: $motherName
+      countryCode: $countryCode
+      phoneNumber: $parentPhoneNumber
+      address: $address
+      updatedAt_expr: "request.time"
+    }
+  )
+  auditLog_insert(
+    data: {
+      performedBy_expr: "response.query.users[0].id"
+      performedRole_expr: "response.query.users[0].role"
+      action: "STUDENT_UPDATED"
+      entityType: "STUDENT"
+      entityId_expr: "response.student_update.id"
+      branchId: $branchId
+      newData: "Student updated"
+    }
+  )
+}
+
+mutation CreateAttendance(
+  $studentId: UUID!
+  $academicClassId: UUID!
+  $sectionId: UUID!
+  $branchId: UUID
+  $attendanceDate: Date!
+  $status: String!
+  $markedById: UUID!
+  $remarks: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {id: {eq: $markedById}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin", "PRINCIPAL", "principal", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin", "PRINCIPAL", "principal", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Attendance creation access required") {
+      id
+      role
+      branchId
+    }
+    students(
+      where: {id: {eq: $studentId}, academicClassId: {eq: $academicClassId}, sectionId: {eq: $sectionId}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(s, true)", message: "Active student not found for selected class and section") {
+      id
+    }
+  }
+  attendance_insert(
+    data: {
+      student: {id: $studentId}
+      academicClass: {id: $academicClassId}
+      section: {id: $sectionId}
+      branch: {id: $branchId}
+      attendanceDate: $attendanceDate
+      status: $status
+      isLocked: true
+      lockedAt_expr: "request.time"
+      markedBy: {id: $markedById}
+      remarks: $remarks
+      updatedAt_expr: "request.time"
+    }
+  )
+  auditLog_insert(
+    data: {
+      performedBy_expr: "response.query.users[0].id"
+      performedRole_expr: "response.query.users[0].role"
+      action: "ATTENDANCE_MARKED"
+      entityType: "ATTENDANCE"
+      entityId_expr: "response.attendance_insert.id"
+      branchId_expr: "response.query.users[0].branchId"
+      newData: "Attendance marked"
+    }
+  )
+}
+
+mutation UpdateAttendance(
+  $id: UUID!
+  $status: String!
+  $editedById: UUID!
+  $remarks: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {id: {eq: $editedById}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin", "PRINCIPAL", "principal", "COORDINATOR", "coordinator"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin", "PRINCIPAL", "principal", "COORDINATOR", "coordinator"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Attendance edit access required") {
+      id
+      role
+      branchId
+    }
+    # Server-side lock enforcement: reject update if record is locked
+    attendances(where: {id: {eq: $id}, isLocked: {eq: false}}, limit: 1)
+      @check(expr: "this.exists(a, true)", message: "This attendance record is locked and cannot be modified") {
+      id
+    }
+  }
+  attendance_update(
+    id: $id
+    data: {
+      status: $status
+      editedBy: {id: $editedById}
+      remarks: $remarks
+      updatedAt_expr: "request.time"
+    }
+  )
+  auditLog_insert(
+    data: {
+      performedBy_expr: "response.query.users[0].id"
+      performedRole_expr: "response.query.users[0].role"
+      action: "ATTENDANCE_EDITED"
+      entityType: "ATTENDANCE"
+      entityId_expr: "response.attendance_update.id"
+      branchId_expr: "response.query.users[0].branchId"
+      newData: "Attendance edited"
+    }
+  )
+}
+
+mutation UploadFeePayment(
+  $studentId: UUID!
+  $studentFeeId: UUID!
+  $amount: Float!
+  $paymentMode: String!
+  $receiptNumber: String
+  $uploadedById: UUID!
+  $remarks: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {id: {eq: $uploadedById}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal", "ACCOUNTANT", "accountant"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal", "ACCOUNTANT", "accountant"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Fee payment upload access required") {
+      id
+      role
+    }
+  }
+  payment_insert(
+    data: {
+      student: {id: $studentId}
+      studentFee: {id: $studentFeeId}
+      amount: $amount
+      paymentMode: $paymentMode
+      receiptNumber: $receiptNumber
+      uploadedBy: {id: $uploadedById}
+      remarks: $remarks
+    }
+  )
+}
+
+mutation AssignTeacher(
+  $teacherId: UUID!
+  $branchId: UUID!
+  $wingId: UUID @retired
+  $academicClassId: UUID!
+  $sectionId: UUID!
+  $subjectName: String
+  $isClassTeacher: Boolean!
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Teacher assignment access required") {
+      id
+      role
+      branchId
+    }
+  }
+  teacherAssignment_insert(
+    data: {
+      teacher: {id: $teacherId}
+      branch: {id: $branchId}
+      academicClass: {id: $academicClassId}
+      section: {id: $sectionId}
+      subjectName: $subjectName
+      isClassTeacher: $isClassTeacher
+      isActive: true
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+
+
+mutation CreateCoordinator(
+  $firebaseUID: String!
+  $fullName: String!
+  $countryCode: String!
+  $phoneNumber: String!
+  $email: String
+  $gender: String
+  $employeeId: String!
+  $staffType: String! = "TEACHING"
+  $joiningYear: Int!
+  $branchCode: String!
+  $serialNumber: Int!
+  $branchId: UUID!
+  $wing: String!
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Principal or Main Admin for this branch required") {
+      id
+      role
+      branchId
+    }
+    activeCoordinators: coordinators(
+      where: {branchId: {eq: $branchId}, wing: {eq: $wing}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "!this.exists(c, true)", message: "This wing already has an active coordinator") {
+      id
+    }
+  }
+  employeeSequence_upsert(
+    data: {
+      year: $joiningYear
+      branchCode: $branchCode
+      staffType: $staffType
+      lastSequence: $serialNumber
+      updatedAt_expr: "request.time"
+    }
+  )
+  staffIdSequence_upsert(
+    data: {
+      joiningYear: $joiningYear
+      branchCode: $branchCode
+      staffType: $staffType
+      lastSerialNumber: $serialNumber
+      updatedAt_expr: "request.time"
+    }
+  )
+  user_insert(
+    data: {
+      firebaseUID: $firebaseUID
+      fullName: $fullName
+      countryCode: $countryCode
+      phoneNumber: $phoneNumber
+      status: "ACTIVE"
+      role: "COORDINATOR"
+      employeeId: $employeeId
+      staffType: $staffType
+      branch: {id: $branchId}
+      isActive: true
+      updatedAt_expr: "request.time"
+    }
+  )
+  userRole_upsert(
+    data: {
+      userId_expr: "response.user_insert.id"
+      role: "COORDINATOR"
+    }
+  )
+  coordinator_insert(
+    data: {
+      userId_expr: "response.user_insert.id"
+      branch: {id: $branchId}
+      wing: $wing
+      email: $email
+      gender: $gender
+      employeeId: $employeeId
+      staffType: $staffType
+      isActive: true
+      updatedAt_expr: "request.time"
+    }
+  )
+  auditLog_insert(
+    data: {
+      performedBy_expr: "response.query.users[0].id"
+      performedRole_expr: "response.query.users[0].role"
+      action: "STAFF_CREATED"
+      entityType: "STAFF"
+      entityId: $employeeId
+      branchId: $branchId
+      newData: "Coordinator teaching staff created"
+    }
+  )
+}
+
+mutation CreateTeacher(
+  $firebaseUID: String!
+  $fullName: String!
+  $countryCode: String!
+  $phoneNumber: String!
+  $alternateMobileNumber: String
+  $email: String
+  $dateOfBirth: Date
+  $gender: String! = "Other"
+  $joiningDate: Date! = "2026-01-01"
+  $designation: String! = "Teacher"
+  $qualification: String
+  $experience: String
+  $address: String
+  $city: String
+  $state: String
+  $pincode: String
+  $emergencyContact: String
+  $bloodGroup: String
+  $employeeId: String!
+  $staffType: String!
+  $joiningYear: Int!
+  $branchCode: String!
+  $serialNumber: Int!
+  $branchId: UUID!
+  $wing: String @retired
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Branch staff management access required") {
+      id
+      role
+      branchId
+    }
+  }
+  employeeSequence_upsert(
+    data: {
+      year: $joiningYear
+      branchCode: $branchCode
+      staffType: $staffType
+      lastSequence: $serialNumber
+      updatedAt_expr: "request.time"
+    }
+  )
+  staffIdSequence_upsert(
+    data: {
+      joiningYear: $joiningYear
+      branchCode: $branchCode
+      staffType: $staffType
+      lastSerialNumber: $serialNumber
+      updatedAt_expr: "request.time"
+    }
+  )
+  user_insert(
+    data: {
+      firebaseUID: $firebaseUID
+      fullName: $fullName
+      countryCode: $countryCode
+      phoneNumber: $phoneNumber
+      status: "ACTIVE"
+      role: "TEACHER"
+      employeeId: $employeeId
+      staffType: $staffType
+      branch: {id: $branchId}
+      isActive: true
+      updatedAt_expr: "request.time"
+    }
+  )
+  userRole_upsert(
+    data: {
+      userId_expr: "response.user_insert.id"
+      role: "TEACHER"
+    }
+  )
+  teacher_insert(
+    data: {
+      userId_expr: "response.user_insert.id"
+      employeeId: $employeeId
+      staffType: $staffType
+      branch: {id: $branchId}
+      joiningDate: $joiningDate
+      designation: $designation
+      gender: $gender
+      alternateMobileNumber: $alternateMobileNumber
+      email: $email
+      dateOfBirth: $dateOfBirth
+      qualification: $qualification
+      experience: $experience
+      address: $address
+      city: $city
+      state: $state
+      pincode: $pincode
+      emergencyContact: $emergencyContact
+      bloodGroup: $bloodGroup
+      isActive: true
+      updatedAt_expr: "request.time"
+    }
+  )
+  auditLog_insert(
+    data: {
+      performedBy_expr: "response.query.users[0].id"
+      performedRole_expr: "response.query.users[0].role"
+      action: "STAFF_CREATED"
+      entityType: "STAFF"
+      entityId: $employeeId
+      branchId: $branchId
+      newData: "Teacher staff created"
+    }
+  )
+}
+
+mutation AssignTeacherClassTeacher(
+  $sectionId: UUID!
+  $teacherId: UUID!
+  $teacherUserId: UUID!
+  $branchId: UUID!
+  $sectionAuditId: String
+  $teacherAuditId: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                      ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Class teacher assignment access required") {
+      id
+      role
+      branchId
+    }
+    teacherSectionAssignments(
+      where: {teacherId: {eq: $teacherId}, isClassTeacher: {eq: true}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "!this.exists(s, true)", message: "Teacher is already assigned as a class teacher") {
+      id
+    }
+    currentSectionTeacher: teacherSectionAssignments(
+      where: {sectionId: {eq: $sectionId}, isClassTeacher: {eq: true}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "!this.exists(s, true)", message: "This section already has a class teacher") {
+      id
+    }
+    selectedTeacher: teachers(
+      where: {id: {eq: $teacherId}, userId: {eq: $teacherUserId}, branchId: {eq: $branchId}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(t, true)", message: "Selected class teacher profile not found") {
+      id
+      userId
+    }
+  }
+  staleAssignment_clean: teacherSectionAssignment_deleteMany(
+    where: {
+      teacherId: {eq: $teacherId}
+      sectionId: {eq: $sectionId}
+      isClassTeacher: {eq: true}
+      isActive: {eq: false}
+    }
+  )
+  teacherSectionAssignment_insert(
+    data: {
+      teacher: {id: $teacherId}
+      section: {id: $sectionId}
+      assignedById_expr: "response.query.users[0].id"
+      isClassTeacher: true
+      isActive: true
+      updatedAt_expr: "request.time"
+    }
+  )
+  section_update(
+    id: $sectionId
+    data: {
+      classTeacher: {id: $teacherUserId}
+      updatedAt_expr: "request.time"
+    }
+  )
+  userRole_upsert(
+    data: {
+      user: {id: $teacherUserId}
+      role: "CLASS_TEACHER"
+    }
+  )
+  auditLog_insert(
+    data: {
+      performedBy_expr: "response.query.users[0].id"
+      performedRole_expr: "response.query.users[0].role"
+      action: "CLASS_TEACHER_ASSIGNED"
+      entityType: "CLASS_TEACHER_ASSIGNMENT"
+      entityId: $sectionAuditId
+      branchId: $branchId
+      oldData: null
+      newData: $teacherAuditId
+    }
+  )
+  roleAuditLog_insert: auditLog_insert(
+    data: {
+      user: {id: $teacherUserId}
+      performedBy_expr: "response.query.users[0].id"
+      performedRole_expr: "response.query.users[0].role"
+      action: "ROLE_ADDED"
+      entityType: "USER_ROLE"
+      entityId_expr: "vars.teacherUserId"
+      branchId: $branchId
+      newRole: "CLASS_TEACHER"
+      newData: "Class Teacher role ensured"
+    }
+  )
+}
+
+mutation UpdateTeacher(
+  $teacherId: UUID!
+  $userId: UUID!
+  $fullName: String!
+  $countryCode: String!
+  $phoneNumber: String!
+  $alternateMobileNumber: String
+  $email: String
+  $dateOfBirth: Date
+  $gender: String!
+  $joiningDate: Date!
+  $designation: String!
+  $qualification: String
+  $experience: String
+  $address: String
+  $city: String
+  $state: String
+  $pincode: String
+  $emergencyContact: String
+  $bloodGroup: String
+  $branchId: UUID!
+  $wing: String @retired
+  $isActive: Boolean!
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Branch staff management access required") {
+      id
+      role
+      branchId
+    }
+    # C-2 security fix: verify the target teacher record belongs to the caller's branch.
+    # Without this, a coordinator from Branch A could update a teacher from Branch B
+    # simply by supplying Branch A's branchId with Branch B's teacherId.
+    selectedTeacher: teachers(
+      where: {id: {eq: $teacherId}, branchId: {eq: $branchId}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(t, true)", message: "Teacher not found in this branch") {
+      id
+    }
+    # Verify the user record also belongs to the same branch to prevent user_update IDOR.
+    selectedUser: users(
+      where: {id: {eq: $userId}, branchId: {eq: $branchId}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "User not found in this branch") {
+      id
+    }
+  }
+  user_update(
+    id: $userId
+    data: {
+      fullName: $fullName
+      countryCode: $countryCode
+      phoneNumber: $phoneNumber
+      isActive: $isActive
+      updatedAt_expr: "request.time"
+    }
+  )
+  teacher_update(
+    id: $teacherId
+    data: {
+      joiningDate: $joiningDate
+      designation: $designation
+      gender: $gender
+      alternateMobileNumber: $alternateMobileNumber
+      email: $email
+      dateOfBirth: $dateOfBirth
+      qualification: $qualification
+      experience: $experience
+      address: $address
+      city: $city
+      state: $state
+      pincode: $pincode
+      emergencyContact: $emergencyContact
+      bloodGroup: $bloodGroup
+      isActive: $isActive
+      updatedAt_expr: "request.time"
+    }
+  )
+  # L-3 fix: audit log was missing from UpdateTeacher (CreateTeacher already logs).
+  auditLog_insert(
+    data: {
+      performedBy_expr: "response.query.users[0].id"
+      performedRole_expr: "response.query.users[0].role"
+      action: "STAFF_UPDATED"
+      entityType: "STAFF"
+      entityId_expr: "response.teacher_update.id"
+      branchId: $branchId
+      newData: "Teacher staff updated"
+    }
+  )
+}
+
+mutation AssignClassTeacher($sectionId: UUID!, $teacherId: UUID!) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Principal required") {
+      id
+      role
+    }
+    sections(
+      where: {classTeacherId: {eq: $teacherId}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "!this.exists(s, true)", message: "Teacher is already assigned as a class teacher") {
+      id
+    }
+  }
+  section_update(
+    id: $sectionId
+    data: {
+      classTeacher: {id: $teacherId}
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation CreateSubject($name: String!, $code: String!, $status: String! = "ACTIVE") @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Principal required") {
+      id
+      role
+    }
+  }
+  subject_insert(
+    data: {
+      name: $name
+      code: $code
+      status: $status
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation AssignTeacherSubject($teacherId: UUID!, $subjectId: UUID!, $branchId: UUID!) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                      ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Subject assignment access required") {
+      id
+      role
+      branchId
+    }
+    selectedTeacher: teachers(
+      where: {id: {eq: $teacherId}, branchId: {eq: $branchId}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(t, true)", message: "Selected teacher profile not found") {
+      id
+      userId
+    }
+  }
+  teacherSubject_insert(
+    data: {
+      teacher: {id: $teacherId}
+      subject: {id: $subjectId}
+    }
+  )
+  userRole_upsert(
+    data: {
+      userId_expr: "response.query.selectedTeacher[0].userId"
+      role: "TEACHER"
+    }
+  )
+  auditLog_insert(
+    data: {
+      userId_expr: "response.query.selectedTeacher[0].userId"
+      performedBy_expr: "response.query.users[0].id"
+      performedRole_expr: "response.query.users[0].role"
+      action: "ROLE_ADDED"
+      entityType: "USER_ROLE"
+      entityId_expr: "response.query.selectedTeacher[0].userId"
+      branchId: $branchId
+      newRole: "TEACHER"
+      newData: "Teacher role ensured for subject assignment"
+    }
+  )
+}
+
+mutation ClearTeacherSubjects($teacherId: UUID!, $branchId: UUID!) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                      ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Subject assignment access required") {
+      id
+      role
+      branchId
+    }
+  }
+  teacherSubject_deleteMany(where: {teacherId: {eq: $teacherId}})
+}
+
+mutation CreateAccountant(
+  $firebaseUID: String!
+  $fullName: String!
+  $countryCode: String!
+  $phoneNumber: String!
+  $email: String
+  $gender: String!
+  $joiningDate: Date!
+  $designation: String!
+  $qualification: String
+  $experience: String
+  $address: String
+  $city: String
+  $state: String
+  $pincode: String
+  $emergencyContact: String
+  $bloodGroup: String
+  $employeeId: String!
+  $staffType: String! = "SUPPORTING"
+  $joiningYear: Int!
+  $branchCode: String!
+  $serialNumber: Int!
+  $branchId: UUID!
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Principal or Main Admin for this branch required") {
+      id
+      role
+      branchId
+    }
+  }
+  employeeSequence_upsert(
+    data: {
+      year: $joiningYear
+      branchCode: $branchCode
+      staffType: $staffType
+      lastSequence: $serialNumber
+      updatedAt_expr: "request.time"
+    }
+  )
+  staffIdSequence_upsert(
+    data: {
+      joiningYear: $joiningYear
+      branchCode: $branchCode
+      staffType: $staffType
+      lastSerialNumber: $serialNumber
+      updatedAt_expr: "request.time"
+    }
+  )
+  user_insert(
+    data: {
+      firebaseUID: $firebaseUID
+      fullName: $fullName
+      countryCode: $countryCode
+      phoneNumber: $phoneNumber
+      status: "ACTIVE"
+      role: "ACCOUNTANT"
+      employeeId: $employeeId
+      staffType: $staffType
+      branch: {id: $branchId}
+      isActive: true
+      updatedAt_expr: "request.time"
+    }
+  )
+  userRole_upsert(
+    data: {
+      userId_expr: "response.user_insert.id"
+      role: "ACCOUNTANT"
+    }
+  )
+  accountant_insert(
+    data: {
+      userId_expr: "response.user_insert.id"
+      employeeId: $employeeId
+      staffType: $staffType
+      branch: {id: $branchId}
+      joiningDate: $joiningDate
+      designation: $designation
+      gender: $gender
+      email: $email
+      qualification: $qualification
+      experience: $experience
+      address: $address
+      city: $city
+      state: $state
+      pincode: $pincode
+      emergencyContact: $emergencyContact
+      bloodGroup: $bloodGroup
+      isActive: true
+      updatedAt_expr: "request.time"
+    }
+  )
+  auditLog_insert(
+    data: {
+      performedBy_expr: "response.query.users[0].id"
+      performedRole_expr: "response.query.users[0].role"
+      action: "STAFF_CREATED"
+      entityType: "STAFF"
+      entityId: $employeeId
+      branchId: $branchId
+      newData: "Accountant supporting staff created"
+    }
+  )
+}
+
+mutation ClearTeacherWingRestrictions($branchId: UUID!) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Branch staff migration access required") {
+      id
+      role
+      branchId
+    }
+  }
+  teacher_updateMany(
+    where: {branchId: {eq: $branchId}}
+    data: {
+      wing: null
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation EnsureCoordinatorTeacherProfile(
+  $userId: UUID!
+  $branchId: UUID!
+  $employeeId: String!
+  $staffType: String! = "TEACHING"
+  $joiningDate: Date!
+  $designation: String! = "Class Teacher"
+  $gender: String! = "Other"
+  $email: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    currentUser: users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                      ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Coordinator teacher profile access required") {
+      id
+      role
+      branchId
+    }
+    targetUser: users(
+      where: {id: {eq: $userId}, branchId: {eq: $branchId}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Coordinator user not found in branch") {
+      id
+    }
+    targetCoordinator: coordinators(
+      where: {userId: {eq: $userId}, branchId: {eq: $branchId}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(c, true)", message: "Active coordinator profile required") {
+      id
+    }
+    existingTeacher: teachers(
+      where: {userId: {eq: $userId}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "!this.exists(t, true)", message: "Teacher profile already exists") {
+      id
+    }
+  }
+  teacher_insert(
+    data: {
+      user: {id: $userId}
+      branch: {id: $branchId}
+      employeeId: $employeeId
+      staffType: $staffType
+      joiningDate: $joiningDate
+      designation: $designation
+      gender: $gender
+      email: $email
+      isActive: true
+      updatedAt_expr: "request.time"
+    }
+  )
+  auditLog_insert(
+    data: {
+      user: {id: $userId}
+      performedBy_expr: "response.query.currentUser[0].id"
+      performedRole_expr: "response.query.currentUser[0].role"
+      action: "TEACHER_PROFILE_CREATED"
+      entityType: "TEACHER"
+      entityId_expr: "response.teacher_insert.id"
+      branchId: $branchId
+      newData: "Coordinator teacher profile created for class teacher assignment"
+    }
+  )
+}
+
+mutation UpdateClassTeacherAssignment(
+  $assignmentId: UUID!
+  $oldSectionId: UUID!
+  $sectionId: UUID!
+  $teacherId: UUID!
+  $teacherUserId: UUID!
+  $branchId: UUID!
+  $oldTeacherId: UUID
+  $sectionAuditId: String!
+  $teacherAuditId: String!
+  $oldTeacherAuditId: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                      ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Class teacher assignment access required") {
+      id
+      role
+      branchId
+    }
+    teacherConflicts: teacherSectionAssignments(
+      where: {teacherId: {eq: $teacherId}, id: {ne: $assignmentId}, isClassTeacher: {eq: true}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "!this.exists(s, true)", message: "Teacher is already assigned as a class teacher") {
+      id
+    }
+    sectionConflicts: teacherSectionAssignments(
+      where: {sectionId: {eq: $sectionId}, id: {ne: $assignmentId}, isClassTeacher: {eq: true}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "!this.exists(s, true)", message: "This section already has a class teacher") {
+      id
+    }
+    selectedTeacher: teachers(
+      where: {id: {eq: $teacherId}, userId: {eq: $teacherUserId}, branchId: {eq: $branchId}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(t, true)", message: "Selected class teacher profile not found") {
+      id
+      userId
+    }
+  }
+  teacherSectionAssignment_update(
+    id: $assignmentId
+    data: {
+      isActive: false
+      updatedAt_expr: "request.time"
+    }
+  )
+  oldSection_update: section_update(
+    id: $oldSectionId
+    data: {
+      classTeacher: null
+      updatedAt_expr: "request.time"
+    }
+  )
+  staleAssignment_clean: teacherSectionAssignment_deleteMany(
+    where: {
+      teacherId: {eq: $teacherId}
+      sectionId: {eq: $sectionId}
+      isClassTeacher: {eq: true}
+      isActive: {eq: false}
+    }
+  )
+  teacherSectionAssignment_insert(
+    data: {
+      teacher: {id: $teacherId}
+      section: {id: $sectionId}
+      assignedById_expr: "response.query.users[0].id"
+      isClassTeacher: true
+      isActive: true
+      updatedAt_expr: "request.time"
+    }
+  )
+  section_update(
+    id: $sectionId
+    data: {
+      classTeacher: {id: $teacherUserId}
+      updatedAt_expr: "request.time"
+    }
+  )
+  userRole_upsert(
+    data: {
+      user: {id: $teacherUserId}
+      role: "CLASS_TEACHER"
+    }
+  )
+  auditLog_insert(
+    data: {
+      performedBy_expr: "response.query.users[0].id"
+      performedRole_expr: "response.query.users[0].role"
+      action: "CLASS_TEACHER_CHANGED"
+      entityType: "CLASS_TEACHER_ASSIGNMENT"
+      entityId: $sectionAuditId
+      branchId: $branchId
+      oldData: $oldTeacherAuditId
+      newData: $teacherAuditId
+    }
+  )
+  roleAuditLog_insert: auditLog_insert(
+    data: {
+      user: {id: $teacherUserId}
+      performedBy_expr: "response.query.users[0].id"
+      performedRole_expr: "response.query.users[0].role"
+      action: "ROLE_ADDED"
+      entityType: "USER_ROLE"
+      entityId_expr: "vars.teacherUserId"
+      branchId: $branchId
+      newRole: "CLASS_TEACHER"
+      newData: "Class Teacher role ensured"
+    }
+  )
+}
+
+mutation RemoveClassTeacherAssignment(
+  $assignmentId: UUID!
+  $sectionId: UUID!
+  $teacherId: UUID!
+  $branchId: UUID!
+  $sectionAuditId: String!
+  $teacherAuditId: String!
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                      ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Class teacher assignment access required") {
+      id
+      role
+      branchId
+    }
+    selectedTeacher: teachers(
+      where: {id: {eq: $teacherId}, branchId: {eq: $branchId}}
+      limit: 1
+    ) @check(expr: "this.exists(t, true)", message: "Selected class teacher profile not found") {
+      id
+      userId
+    }
+  }
+  teacherSectionAssignment_update(
+    id: $assignmentId
+    data: {
+      isActive: false
+      updatedAt_expr: "request.time"
+    }
+  )
+  section_update(
+    id: $sectionId
+    data: {
+      classTeacher: null
+      updatedAt_expr: "request.time"
+    }
+  )
+  auditLog_insert(
+    data: {
+      performedBy_expr: "response.query.users[0].id"
+      performedRole_expr: "response.query.users[0].role"
+      action: "CLASS_TEACHER_REMOVED"
+      entityType: "CLASS_TEACHER_ASSIGNMENT"
+      entityId: $sectionAuditId
+      branchId: $branchId
+      oldData: $teacherAuditId
+      newData: null
+    }
+  )
+  roleAuditLog_insert: auditLog_insert(
+    data: {
+      userId_expr: "response.query.selectedTeacher[0].userId"
+      performedBy_expr: "response.query.users[0].id"
+      performedRole_expr: "response.query.users[0].role"
+      action: "ROLE_REMOVED"
+      entityType: "USER_ROLE"
+      entityId_expr: "response.query.selectedTeacher[0].userId"
+      branchId: $branchId
+      oldRole: "CLASS_TEACHER"
+      oldData: "Class Teacher role removed"
+    }
+  )
+}
+
+mutation RemoveLegacyClassTeacherAssignment(
+  $sectionId: UUID!
+  $teacherUserId: UUID!
+  $branchId: UUID!
+  $sectionAuditId: String!
+  $teacherAuditId: String!
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                      ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Class teacher assignment access required") {
+      id
+      role
+      branchId
+    }
+    selectedTeacherUser: users(
+      where: {id: {eq: $teacherUserId}, branchId: {eq: $branchId}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Selected class teacher user not found") {
+      id
+    }
+  }
+  section_update(
+    id: $sectionId
+    data: {
+      classTeacher: null
+      updatedAt_expr: "request.time"
+    }
+  )
+  auditLog_insert(
+    data: {
+      performedBy_expr: "response.query.users[0].id"
+      performedRole_expr: "response.query.users[0].role"
+      action: "CLASS_TEACHER_REMOVED"
+      entityType: "CLASS_TEACHER_ASSIGNMENT"
+      entityId: $sectionAuditId
+      branchId: $branchId
+      oldData: $teacherAuditId
+      newData: null
+    }
+  )
+  roleAuditLog_insert: auditLog_insert(
+    data: {
+      user: {id: $teacherUserId}
+      performedBy_expr: "response.query.users[0].id"
+      performedRole_expr: "response.query.users[0].role"
+      action: "ROLE_REMOVED"
+      entityType: "USER_ROLE"
+      entityId_expr: "vars.teacherUserId"
+      branchId: $branchId
+      oldRole: "CLASS_TEACHER"
+      oldData: "Class Teacher role removed"
+    }
+  )
+}
+
+mutation UpdateAccountant(
+  $accountantId: UUID!
+  $userId: UUID!
+  $branchId: UUID!
+  $fullName: String!
+  $countryCode: String!
+  $phoneNumber: String!
+  $email: String
+  $gender: String!
+  $joiningDate: Date!
+  $designation: String!
+  $qualification: String
+  $experience: String
+  $address: String
+  $city: String
+  $state: String
+  $pincode: String
+  $emergencyContact: String
+  $bloodGroup: String
+  $isActive: Boolean!
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Principal or Main Admin for this branch required") {
+      id
+      role
+      branchId
+    }
+  }
+  user_update(
+    id: $userId
+    data: {
+      fullName: $fullName
+      countryCode: $countryCode
+      phoneNumber: $phoneNumber
+      isActive: $isActive
+      updatedAt_expr: "request.time"
+    }
+  )
+  accountant_update(
+    id: $accountantId
+    data: {
+      joiningDate: $joiningDate
+      designation: $designation
+      gender: $gender
+      email: $email
+      qualification: $qualification
+      experience: $experience
+      address: $address
+      city: $city
+      state: $state
+      pincode: $pincode
+      emergencyContact: $emergencyContact
+      bloodGroup: $bloodGroup
+      isActive: $isActive
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation CreateFeeCategory($name: String!, $status: String! = "ACTIVE") @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal", "COORDINATOR", "coordinator"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal", "COORDINATOR", "coordinator"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Fee category management access required") {
+      id
+      role
+    }
+  }
+  feeCategory_insert(data: {name: $name, status: $status, updatedAt_expr: "request.time"})
+}
+
+mutation UpdateFeeCategory($categoryId: UUID!, $name: String!, $status: String!) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal", "COORDINATOR", "coordinator"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal", "COORDINATOR", "coordinator"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Fee category management access required") {
+      id
+      role
+    }
+  }
+  feeCategory_update(id: $categoryId, data: {name: $name, status: $status, updatedAt_expr: "request.time"})
+}
+
+mutation CreateClassFee(
+  $branchId: UUID!
+  $academicClassId: UUID!
+  $academicYear: Int!
+  $term1Fee: Float!
+  $term2Fee: Float!
+  $term3Fee: Float!
+  $totalTuitionFee: Float!
+  $applyToFuture: Boolean!
+  $status: String!
+  $createdById: UUID!
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Class fee management access required") {
+      id
+      role
+      branchId
+    }
+    academicClasses(where: {id: {eq: $academicClassId}, branchId: {eq: $branchId}, isActive: {eq: true}}, limit: 1) @check(expr: "this.exists(c, true)", message: "Class not found in branch") {
+      id
+    }
+    academicYearFeeTemplates(where: {branchId: {eq: $branchId}, academicClassId: {eq: $academicClassId}, academicYear: {eq: $academicYear}}, limit: 1) @check(expr: "!this.exists(t, true)", message: "Class fee already exists for this academic year") {
+      id
+    }
+  }
+  academicYearFeeTemplate_insert(
+    data: {
+      branch: {id: $branchId}
+      academicClass: {id: $academicClassId}
+      academicYear: $academicYear
+      term1Fee: $term1Fee
+      term2Fee: $term2Fee
+      term3Fee: $term3Fee
+      totalTuitionFee: $totalTuitionFee
+      applyToFuture: $applyToFuture
+      status: $status
+      createdBy: {id: $createdById}
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation UpdateClassFee(
+  $classFeeId: UUID!
+  $branchId: UUID!
+  $academicClassId: UUID!
+  $academicYear: Int!
+  $term1Fee: Float!
+  $term2Fee: Float!
+  $term3Fee: Float!
+  $totalTuitionFee: Float!
+  $applyToFuture: Boolean!
+  $status: String!
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Class fee management access required") {
+      id
+      role
+      branchId
+    }
+    academicYearFeeTemplates(where: {id: {eq: $classFeeId}, branchId: {eq: $branchId}}, limit: 1) @check(expr: "this.exists(t, true)", message: "Class fee not found in branch") {
+      id
+    }
+    academicClasses(where: {id: {eq: $academicClassId}, branchId: {eq: $branchId}, isActive: {eq: true}}, limit: 1) @check(expr: "this.exists(c, true)", message: "Class not found in branch") {
+      id
+    }
+  }
+  academicYearFeeTemplate_update(
+    id: $classFeeId
+    data: {
+      academicClass: {id: $academicClassId}
+      academicYear: $academicYear
+      term1Fee: $term1Fee
+      term2Fee: $term2Fee
+      term3Fee: $term3Fee
+      totalTuitionFee: $totalTuitionFee
+      applyToFuture: $applyToFuture
+      status: $status
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation CreateFeePlan(
+  $studentId: UUID!
+  $academicYear: Int!
+  $classFeeTemplateId: UUID
+  $term1Fee: Float! = 0
+  $term2Fee: Float! = 0
+  $term3Fee: Float! = 0
+  $booksFee: Float! = 0
+  $transportFee: Float! = 0
+  $concessionType: String
+  $concessionValue: Float! = 0
+  $concessionAmount: Float! = 0
+  $grossAmount: Float! = 0
+  $totalAmount: Float!
+  $previousYearDue: Float! = 0
+  $carryForwardAmount: Float! = 0
+  $createdById: UUID!
+  $branchId: UUID!
+  $actorRole: String
+  $oldValue: String
+  $newValue: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Fee plan branch access required") {
+      id
+      role
+      branchId
+    }
+    students(where: {id: {eq: $studentId}, branchId: {eq: $branchId}, isActive: {eq: true}}, limit: 1) @check(expr: "this.exists(s, true)", message: "Student not found in branch") {
+      id
+    }
+  }
+  studentFeePlan_insert(
+    data: {
+      student: {id: $studentId}
+      classFeeTemplateId: $classFeeTemplateId
+      academicYear: $academicYear
+      term1Fee: $term1Fee
+      term2Fee: $term2Fee
+      term3Fee: $term3Fee
+      booksFee: $booksFee
+      transportFee: $transportFee
+      concessionType: $concessionType
+      concessionValue: $concessionValue
+      concessionAmount: $concessionAmount
+      grossAmount: $grossAmount
+      totalAmount: $totalAmount
+      previousYearDue: $previousYearDue
+      carryForwardAmount: $carryForwardAmount
+      createdBy: {id: $createdById}
+      isActive: true
+      updatedAt_expr: "request.time"
+    }
+  )
+  feeAuditLog_insert(
+    data: {
+      user: {id: $createdById}
+      role: $actorRole
+      action: "FEE_PLAN_CREATED"
+      student: {id: $studentId}
+      oldValue: $oldValue
+      newValue: $newValue
+    }
+  )
+}
+
+mutation UpdateFeePlan(
+  $feePlanId: UUID!
+  $studentId: UUID!
+  $classFeeTemplateId: UUID
+  $term1Fee: Float! = 0
+  $term2Fee: Float! = 0
+  $term3Fee: Float! = 0
+  $booksFee: Float! = 0
+  $transportFee: Float! = 0
+  $concessionType: String
+  $concessionValue: Float! = 0
+  $concessionAmount: Float! = 0
+  $grossAmount: Float! = 0
+  $totalAmount: Float!
+  $previousYearDue: Float! = 0
+  $carryForwardAmount: Float! = 0
+  $isActive: Boolean!
+  $branchId: UUID!
+  $updatedById: UUID!
+  $actorRole: String
+  $oldValue: String
+  $newValue: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Fee plan branch access required") {
+      id
+      role
+      branchId
+    }
+    studentFeePlans(where: {id: {eq: $feePlanId}, student: {branchId: {eq: $branchId}}}, limit: 1) @check(expr: "this.exists(plan, true)", message: "Fee plan not found in branch") {
+      id
+    }
+  }
+  studentFeePlan_update(
+    id: $feePlanId
+    data: {
+      classFeeTemplateId: $classFeeTemplateId
+      term1Fee: $term1Fee
+      term2Fee: $term2Fee
+      term3Fee: $term3Fee
+      booksFee: $booksFee
+      transportFee: $transportFee
+      concessionType: $concessionType
+      concessionValue: $concessionValue
+      concessionAmount: $concessionAmount
+      grossAmount: $grossAmount
+      totalAmount: $totalAmount
+      previousYearDue: $previousYearDue
+      carryForwardAmount: $carryForwardAmount
+      isActive: $isActive
+      updatedAt_expr: "request.time"
+    }
+  )
+  feeAuditLog_insert(
+    data: {
+      user: {id: $updatedById}
+      role: $actorRole
+      action: "FEE_PLAN_UPDATED"
+      student: {id: $studentId}
+      oldValue: $oldValue
+      newValue: $newValue
+    }
+  )
+}
+
+mutation ClearFeePlanItems($feePlanId: UUID!, $branchId: UUID!) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Fee plan branch access required") {
+      id
+      role
+      branchId
+    }
+    studentFeePlans(where: {id: {eq: $feePlanId}, student: {branchId: {eq: $branchId}}}, limit: 1) @check(expr: "this.exists(plan, true)", message: "Fee plan not found in branch") {
+      id
+    }
+  }
+  studentFeeItem_deleteMany(where: {feePlanId: {eq: $feePlanId}})
+}
+
+mutation CreateFeePlanItem($feePlanId: UUID!, $categoryId: UUID!, $amount: Float!, $branchId: UUID!) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Fee plan branch access required") {
+      id
+      role
+      branchId
+    }
+    studentFeePlans(where: {id: {eq: $feePlanId}, student: {branchId: {eq: $branchId}}}, limit: 1) @check(expr: "this.exists(plan, true)", message: "Fee plan not found in branch") {
+      id
+    }
+  }
+  studentFeeItem_insert(
+    data: {
+      feePlan: {id: $feePlanId}
+      category: {id: $categoryId}
+      amount: $amount
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation RecordPayment(
+  $studentId: UUID!
+  $feePlanId: UUID!
+  $amount: Float!
+  $paymentDate: Date!
+  $paymentMode: String!
+  $referenceNumber: String
+  $receiptNumber: String!
+  $remarks: String
+  $collectedById: UUID!
+  $branchId: UUID!
+  $receiptYear: Int!
+  $branchCode: String!
+  $receiptSequence: Int!
+  $academicYear: Int
+  $actorRole: String
+  $oldValue: String
+  $newValue: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "ACCOUNTANT", "accountant"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "ACCOUNTANT", "accountant"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Fee collection branch access required") {
+      id
+      role
+      branchId
+    }
+    students(where: {id: {eq: $studentId}, branchId: {eq: $branchId}}, limit: 1) @check(expr: "this.exists(s, true)", message: "Student not found in branch") {
+      id
+    }
+  }
+  receiptSequence_upsert(
+    data: {
+      year: $receiptYear
+      branchCode: $branchCode
+      lastSequence: $receiptSequence
+      updatedAt_expr: "request.time"
+    }
+  )
+  feePayment_insert(
+    data: {
+      student: {id: $studentId}
+      feePlan: {id: $feePlanId}
+      amount: $amount
+      paymentDate: $paymentDate
+      paymentMode: $paymentMode
+      referenceNumber: $referenceNumber
+      receiptNumber: $receiptNumber
+      remarks: $remarks
+      academicYear: $academicYear
+      collectedBy: {id: $collectedById}
+      status: "RECORDED"
+      updatedAt_expr: "request.time"
+    }
+  )
+  feeAuditLog_insert(
+    data: {
+      user: {id: $collectedById}
+      role: $actorRole
+      action: "PAYMENT_RECORDED"
+      student: {id: $studentId}
+      oldValue: $oldValue
+      newValue: $newValue
+    }
+  )
+}
+
+mutation UpdatePayment(
+  $paymentId: UUID!
+  $studentId: UUID!
+  $branchId: UUID!
+  $amount: Float!
+  $paymentDate: Date!
+  $paymentMode: String!
+  $referenceNumber: String
+  $remarks: String
+  $updatedById: UUID!
+  $actorRole: String
+  $oldValue: String
+  $newValue: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "ACCOUNTANT", "accountant"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "ACCOUNTANT", "accountant"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Fee collection branch access required") {
+      id
+      role
+      branchId
+    }
+    feePayments(
+      where: {id: {eq: $paymentId}, studentId: {eq: $studentId}, student: {branchId: {eq: $branchId}}, paymentDate: {eq: $paymentDate}, status: {eq: "RECORDED"}}
+      limit: 1
+    ) @check(expr: "this.exists(p, true)", message: "Only same-day recorded payments can be edited") {
+      id
+    }
+  }
+  feePayment_update(
+    id: $paymentId
+    data: {
+      amount: $amount
+      paymentMode: $paymentMode
+      referenceNumber: $referenceNumber
+      remarks: $remarks
+      updatedAt_expr: "request.time"
+    }
+  )
+  feeAuditLog_insert(
+    data: {
+      user: {id: $updatedById}
+      role: $actorRole
+      action: "PAYMENT_EDITED"
+      student: {id: $studentId}
+      oldValue: $oldValue
+      newValue: $newValue
+    }
+  )
+}
+
+mutation ReversePayment(
+  $paymentId: UUID!
+  $studentId: UUID!
+  $branchId: UUID!
+  $reversedById: UUID!
+  $reason: String
+  $actorRole: String
+  $oldValue: String
+  $newValue: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "ACCOUNTANT", "accountant"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "ACCOUNTANT", "accountant"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Payment reversal access required") {
+      id
+      role
+      branchId
+    }
+    feePayments(
+      where: {id: {eq: $paymentId}, studentId: {eq: $studentId}, student: {branchId: {eq: $branchId}}, status: {eq: "RECORDED"}}
+      limit: 1
+    ) @check(expr: "this.exists(p, true)", message: "Recorded payment not found in branch") {
+      id
+    }
+  }
+  feePayment_update(
+    id: $paymentId
+    data: {
+      status: "REVERSED"
+      reversedBy: {id: $reversedById}
+      reversedAt_expr: "request.time"
+      reverseReason: $reason
+      updatedAt_expr: "request.time"
+    }
+  )
+  feeAuditLog_insert(
+    data: {
+      user: {id: $reversedById}
+      role: $actorRole
+      action: "PAYMENT_REVERSED"
+      student: {id: $studentId}
+      oldValue: $oldValue
+      newValue: $newValue
+    }
+  )
+}
+
+mutation RecordAuditLog(
+  $performedBy: String!
+  $performedRole: String!
+  $actingAs: String
+  $branchId: UUID
+  $action: String!
+  $entityType: String
+  $entityId: String
+  $oldData: String
+  $newData: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    currentUser: users(
+      where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Main Admin required") {
+      id
+      role
+    }
+  }
+  auditLog_insert(
+    data: {
+      performedBy: $performedBy
+      performedRole: $performedRole
+      actingAs: $actingAs
+      branchId: $branchId
+      action: $action
+      entityType: $entityType
+      entityId: $entityId
+      oldData: $oldData
+      newData: $newData
+    }
+  )
+}
+
+# â”€â”€ Notice Board â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+mutation CreateNotice(
+  $branchId: UUID!
+  $authorId: UUID!
+  $title: String!
+  $body: String!
+  $category: String!
+  $pinned: Boolean!
+  $date: Date!
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COORDINATOR", "coordinator"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Principal, Coordinator, or Main Admin required") {
+      id
+      role
+      branchId
+    }
+  }
+  notice_insert(data: {
+    branchId: $branchId
+    authorId: $authorId
+    title: $title
+    body: $body
+    category: $category
+    pinned: $pinned
+    date: $date
+  })
+}
+
+mutation UpdateNotice(
+  $id: UUID!
+  $title: String!
+  $body: String!
+  $category: String!
+  $pinned: Boolean!
+) @auth(level: USER) @transaction {
+  query @redact {
+    # MAIN_ADMIN: unrestricted. PRINCIPAL: only notices belonging to their own branch.
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              # PRINCIPAL: branch must own this notice
+              {branches_on_principal: {exist: {notices_on_branch: {exist: {id: {eq: $id}}}, isActive: {eq: true}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Only the branch Principal or Main Admin can update this notice") {
+      id
+      role
+    }
+  }
+  notice_update(id: $id, data: {
+    title: $title
+    body: $body
+    category: $category
+    pinned: $pinned
+  })
+}
+
+mutation DeleteNotice($id: UUID!) @auth(level: USER) @transaction {
+  query @redact {
+    # MAIN_ADMIN: unrestricted. PRINCIPAL: only notices belonging to their own branch.
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              # PRINCIPAL: branch must own this notice
+              {branches_on_principal: {exist: {notices_on_branch: {exist: {id: {eq: $id}}}, isActive: {eq: true}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Only the branch Principal or Main Admin can delete this notice") {
+      id
+      role
+    }
+  }
+  notice_delete(id: $id)
+}
+
+mutation ToggleNoticePin($id: UUID!, $pinned: Boolean!) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Principal or Main Admin required") {
+      id
+      role
+    }
+  }
+  notice_update(id: $id, data: {pinned: $pinned})
+}
+
+# â”€â”€ Timetable â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+mutation UpsertTimetablePeriod(
+  $sectionId: UUID!
+  $branchId: UUID!
+  $day: String!
+  $periodNum: Int!
+  $subject: String
+  $teacherId: UUID
+  $teacherName: String
+  $room: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Principal or Main Admin required") {
+      id
+      role
+      branchId
+    }
+  }
+  timetablePeriod_upsert(data: {
+    sectionId: $sectionId
+    branchId: $branchId
+    day: $day
+    periodNum: $periodNum
+    subject: $subject
+    teacherId: $teacherId
+    teacherName: $teacherName
+    room: $room
+    isActive: true
+  })
+}
+
+mutation ClearTimetableForSection($sectionId: UUID!, $branchId: UUID!) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Principal or Main Admin required") {
+      id
+      role
+      branchId
+    }
+  }
+  timetablePeriod_deleteMany(where: {sectionId: {eq: $sectionId}})
+}
+
+# UpsertTimetablePeriodFull — extended version allowing coordinator + all new fields
+mutation UpsertTimetablePeriodFull(
+  $sectionId: UUID!
+  $branchId: UUID!
+  $day: String!
+  $periodNum: Int!
+  $subject: String
+  $teacherId: UUID
+  $teacherName: String
+  $room: String
+  $startTime: String
+  $endTime: String
+  $status: String
+  $timetableType: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal"]}}}}
+                      {role: {in: ["COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["COORDINATOR", "coordinator"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Principal, Coordinator or Main Admin required") {
+      id
+      role
+      branchId
+    }
+  }
+  timetablePeriod_upsert(data: {
+    sectionId: $sectionId
+    branchId: $branchId
+    day: $day
+    periodNum: $periodNum
+    subject: $subject
+    teacherId: $teacherId
+    teacherName: $teacherName
+    room: $room
+    startTime: $startTime
+    endTime: $endTime
+    status: $status
+    timetableType: $timetableType
+    isActive: true
+  })
+}
+
+mutation PublishTimetableSection(
+  $sectionId: UUID!
+  $branchId: UUID!
+  $publishedById: UUID!
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal"]}}}}
+                      {role: {in: ["COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["COORDINATOR", "coordinator"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Principal, Coordinator or Main Admin required") {
+      id
+      role
+      branchId
+    }
+  }
+  timetablePeriod_updateMany(
+    where: {sectionId: {eq: $sectionId}, branchId: {eq: $branchId}, isActive: {eq: true}}
+    data: {status: "PUBLISHED", publishedById: $publishedById}
+  )
+}
+
+mutation UnpublishTimetableSection(
+  $sectionId: UUID!
+  $branchId: UUID!
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Principal or Main Admin required") {
+      id
+      role
+      branchId
+    }
+  }
+  timetablePeriod_updateMany(
+    where: {sectionId: {eq: $sectionId}, branchId: {eq: $branchId}}
+    data: {status: "DRAFT"}
+  )
+}
+
+# â”€â”€ Suggestions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+mutation CreateSuggestion(
+  $parentId: UUID!
+  $branchId: UUID!
+  $title: String!
+  $message: String!
+  $studentId: UUID
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Authenticated user required") {
+      id
+    }
+  }
+  suggestion_insert(data: {
+    parentId: $parentId
+    branchId: $branchId
+    title: $title
+    message: $message
+    studentId: $studentId
+    status: "Pending"
+  })
+}
+
+mutation RespondToSuggestion($id: UUID!, $response: String!, $status: String!) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Principal or Main Admin required") {
+      id
+      role
+    }
+  }
+  suggestion_update(id: $id, data: {response: $response, status: $status})
+}
+
+# ─── Notification Mutations ──────────────────────────────────────────────────
+
+mutation CreateNotification(
+  $userId: UUID!
+  $branchId: UUID!
+  $title: String!
+  $message: String!
+  $audienceRole: String
+  $createdById: UUID
+  $createdByRole: String
+  $category: String
+  $academicYear: Int
+) @auth(level: USER) @transaction {
+  query @redact {
+    # Only authenticated staff belonging to the target branch can create notifications.
+    # $branchId is the recipient's branch; caller must be affiliated with that branch.
+    callerStaff: users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["TEACHER", "teacher", "CLASS_TEACHER", "class_teacher", "ACCOUNTANT", "accountant"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["TEACHER", "teacher", "CLASS_TEACHER", "class_teacher", "ACCOUNTANT", "accountant"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Only authenticated staff can create notifications") {
+      id
+      role
+    }
+  }
+  notification_insert(
+    data: {
+      userId: $userId
+      branchId: $branchId
+      title: $title
+      message: $message
+      audienceRole: $audienceRole
+      createdById: $createdById
+      createdByRole: $createdByRole
+      category: $category
+      academicYear: $academicYear
+      isRead: false
+    }
+  )
+}
+
+mutation DeleteNotification($id: UUID!) @auth(level: USER) @transaction {
+  query @redact {
+    # Allow: (1) the notification RECIPIENT to remove it from their own inbox,
+    # (2) the notification CREATOR (staff who broadcast it) to retract it,
+    # (3) MAIN_ADMIN for admin cleanup.
+    callerAuthorized: users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              # Recipient: this notification is addressed to the authenticated user
+              {notifications_on_user: {exist: {id: {eq: $id}}}}
+              # Creator: authenticated user broadcast/created this notification
+              {notifications_on_createdBy: {exist: {id: {eq: $id}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Only the notification recipient, creator, or Main Admin can delete notifications") {
+      id
+    }
+  }
+  notification_delete(id: $id)
+}
+
+mutation MarkNotificationRead($id: UUID!) @auth(level: USER) @transaction {
+  query @redact {
+    # Verify this notification belongs to the authenticated user
+    notificationOwner: notifications(
+      where: {
+        id: {eq: $id}
+        user: {firebaseUID: {eq_expr: "auth.uid"}}
+      }
+      limit: 1
+    ) @check(expr: "this.exists(n, true)", message: "Can only mark your own notifications as read") {
+      id
+    }
+  }
+  notification_update(id: $id, data: {isRead: true})
+}
+
+mutation MarkAllNotificationsRead($userId: UUID!) @auth(level: USER) @transaction {
+  query @redact {
+    # Verify $userId belongs to the authenticated caller — prevents marking other users' notifications
+    selfCheck: users(
+      where: {id: {eq: $userId}, firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Can only mark your own notifications as read") {
+      id
+    }
+  }
+  notification_updateMany(
+    where: {userId: {eq: $userId}, isRead: {eq: false}}
+    data: {isRead: true}
+  )
+}
+
+# ── Admin: Change User Primary Role ──────────────────────────────────────────
+# Updates users.role (the authoritative primary role column) to $newRole,
+# then atomically cleans up stale user_roles entries and re-inserts the new
+# primary role. PARENT add-on rows are preserved.
+# Restricted to MAIN_ADMIN callers.
+mutation ChangeUserPrimaryRole($userId: UUID!, $newRole: String!) @auth(level: USER) @transaction {
+  query @redact {
+    caller: users(
+      where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN')", message: "Main Admin only") {
+      id
+      role
+    }
+    targetUser: users(where: {id: {eq: $userId}, isActive: {eq: true}}, limit: 1) {
+      id
+      role
+    }
+  }
+  # 1. Write the new authoritative primary role.
+  user_update(id: $userId, data: {role: $newRole})
+  # 2. Remove all non-PARENT user_roles rows (clears stale entries).
+  staleRoles_clean: userRole_deleteMany(
+    where: {userId: {eq: $userId}, role: {ne: "PARENT"}}
+  )
+  # 3. Re-add the new primary role.
+  userRole_upsert(data: {userId: $userId, role: $newRole})
+}
+
+# Adds a secondary role to a user's user_roles table without changing users.role.
+# Call AFTER ChangeUserPrimaryRole to attach additional roles (e.g. PARENT add-on).
+# MAIN_ADMIN only.
+mutation AddAdditionalRole($userId: UUID!, $role: String!) @auth(level: USER) @transaction {
+  query @redact {
+    caller: users(
+      where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN')", message: "Main Admin only") {
+      id
+      role
+    }
+  }
+  userRole_upsert(data: {userId: $userId, role: $role})
+}
+
+# One-time admin tool to remove stale user_roles entries for a specific user.
+# Call this from MAIN_ADMIN after changing a user's primary role via the DB or
+# Firebase Console without going through the normal role-assignment flow.
+# Keeps PARENT add-on intact. Re-inserts users.role as the sole primary entry.
+mutation CleanUserRolesToPrimary($userId: UUID!) @auth(level: USER) @transaction {
+  query @redact {
+    adminUser: users(
+      where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Main Admin only") {
+      id
+      role
+    }
+    targetUser: users(where: {id: {eq: $userId}, isActive: {eq: true}}, limit: 1) {
+      id
+      role
+    }
+  }
+  staleRoles_clean: userRole_deleteMany(
+    where: {
+      userId: {eq: $userId}
+      role: {ne: "PARENT"}
+    }
+  )
+  userRole_upsert(
+    data: {
+      userId_expr: "response.query.targetUser[0].id"
+      role_expr: "response.query.targetUser[0].role"
+    }
+  )
+}
+
+
+# ── Academic Year mutations ───────────────────────────────────────────────────
+
+mutation CreateAcademicYear(
+  $branchId: UUID!
+  $name: String!
+  $startYear: Int!
+  $startDate: Date!
+  $endDate: Date!
+) @auth(level: USER) @transaction {
+  query @redact {
+    caller: users(
+      where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(u, u.role == 'PRINCIPAL' || u.role == 'MAIN_ADMIN')", message: "Principal or Main Admin only") {
+      id
+      role
+    }
+  }
+  academicYear_insert(data: {
+    branch: {id: $branchId}
+    name: $name
+    startYear: $startYear
+    startDate: $startDate
+    endDate: $endDate
+    status: "PLANNING"
+    isActive: false
+    createdById_expr: "response.query.caller[0].id"
+  })
+}
+
+mutation UpdateAcademicYear(
+  $id: UUID!
+  $name: String!
+  $startDate: Date!
+  $endDate: Date!
+) @auth(level: USER) @transaction {
+  query @redact {
+    caller: users(
+      where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(u, u.role == 'PRINCIPAL' || u.role == 'MAIN_ADMIN')", message: "Principal or Main Admin only") {
+      id
+      role
+    }
+    target: academicYears(where: {id: {eq: $id}}, limit: 1) @check(expr: "this.exists(y, y.status != 'CLOSED')", message: "Cannot edit a closed academic year") {
+      id
+      status
+    }
+  }
+  academicYear_update(id: $id, data: {
+    name: $name
+    startDate: $startDate
+    endDate: $endDate
+    updatedAt_expr: "request.time"
+  })
+}
+
+mutation ActivateAcademicYear($id: UUID!, $branchId: UUID!) @auth(level: USER) @transaction {
+  query @redact {
+    caller: users(
+      where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(u, u.role == 'PRINCIPAL' || u.role == 'MAIN_ADMIN')", message: "Principal or Main Admin only") {
+      id
+      role
+    }
+  }
+  deactivateOthers: academicYear_updateMany(
+    where: {branchId: {eq: $branchId}, id: {ne: $id}}
+    data: {isActive: false}
+  )
+  academicYear_update(id: $id, data: {
+    isActive: true
+    status: "ACTIVE"
+    updatedAt_expr: "request.time"
+  })
+}
+
+mutation CloseAcademicYear($id: UUID!) @auth(level: USER) @transaction {
+  query @redact {
+    caller: users(
+      where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(u, u.role == 'PRINCIPAL' || u.role == 'MAIN_ADMIN')", message: "Principal or Main Admin only") {
+      id
+      role
+    }
+  }
+  academicYear_update(id: $id, data: {
+    isActive: false
+    status: "CLOSED"
+    updatedAt_expr: "request.time"
+  })
+}
+
+# ── Per-student promotion mutation ───────────────────────────────────────────
+# promotionStatus: PROMOTED | REPEATED | DROPPED | TRANSFERRED
+# toSectionId and toClassId are required for PROMOTED, optional for others.
+
+mutation RecordStudentPromotion(
+  $branchId: UUID!
+  $studentId: UUID!
+  $fromClassId: UUID!
+  $fromSectionId: UUID!
+  $toClassId: UUID
+  $toSectionId: UUID
+  $promotionStatus: String!
+  $academicYear: Int!
+  $remarks: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    caller: users(
+      where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(u, u.role == 'PRINCIPAL' || u.role == 'COORDINATOR' || u.role == 'MAIN_ADMIN')", message: "Principal or Coordinator only") {
+      id
+      role
+    }
+  }
+  studentPromotionHistory_insert(data: {
+    branch: {id: $branchId}
+    student: {id: $studentId}
+    fromClass: {id: $fromClassId}
+    fromSection: {id: $fromSectionId}
+    toClass: {id: $toClassId}
+    toSection: {id: $toSectionId}
+    promotionStatus: $promotionStatus
+    academicYear: $academicYear
+    promotedById_expr: "response.query.caller[0].id"
+    remarks: $remarks
+  })
+}
+
+# Moves a student to the new section/class AND records the StudentAcademicHistory
+# snapshot for the academic year being completed (the "from" placement). The
+# snapshot is upserted on the (student, academicYear) unique key so re-running a
+# promotion is idempotent. branchId/fromClassId/fromSectionId describe where the
+# student sat during $academicYear; promotedToSection points to the new section.
+mutation ApplyStudentPromotion(
+  $studentId: UUID!
+  $toSectionId: UUID!
+  $toClassId: UUID!
+  $branchId: UUID!
+  $fromClassId: UUID!
+  $fromSectionId: UUID!
+  $academicYear: Int!
+  $promotionStatus: String! = "PROMOTED"
+) @auth(level: USER) @transaction {
+  query @redact {
+    caller: users(
+      where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+      limit: 1
+    ) @check(expr: "this.exists(u, u.role == 'PRINCIPAL' || u.role == 'MAIN_ADMIN')", message: "Principal only") {
+      id
+      role
+    }
+  }
+  studentAcademicHistory_upsert(data: {
+    student: {id: $studentId}
+    section: {id: $fromSectionId}
+    academicClass: {id: $fromClassId}
+    branch: {id: $branchId}
+    promotedToSection: {id: $toSectionId}
+    academicYear: $academicYear
+    promotionStatus: $promotionStatus
+    promotedById_expr: "response.query.caller[0].id"
+    promotedAt_expr: "request.time"
+    updatedAt_expr: "request.time"
+  })
+  student_update(id: $studentId, data: {
+    sectionId: $toSectionId
+    academicClassId: $toClassId
+  })
+}
+
+# ── Holiday Mutations ────────────────────────────────────────────────────────
+
+mutation CreateHoliday(
+  $branchId: UUID!
+  $name: String!
+  $date: Date!
+  $type: String!
+  $description: String
+  $createdById: UUID!
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {id: {eq: $createdById}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["PRINCIPAL", "principal", "COORDINATOR", "coordinator", "MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COORDINATOR", "coordinator", "MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Holiday creation requires Principal or Coordinator role") {
+      id
+      role
+      branchId
+    }
+  }
+  holiday_insert(
+    data: {
+      branch: {id: $branchId}
+      name: $name
+      date: $date
+      type: $type
+      description: $description
+      createdBy: {id: $createdById}
+      updatedAt_expr: "request.time"
+    }
+  )
+  auditLog_insert(
+    data: {
+      performedBy_expr: "response.query.users[0].id"
+      performedRole_expr: "response.query.users[0].role"
+      action: "HOLIDAY_CREATED"
+      entityType: "HOLIDAY"
+      entityId_expr: "response.holiday_insert.id"
+      branchId_expr: "response.query.users[0].branchId"
+      newData: "Holiday created"
+    }
+  )
+}
+
+mutation UpdateHoliday(
+  $id: UUID!
+  $name: String!
+  $date: Date!
+  $type: String!
+  $description: String
+  $updatedById: UUID!
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {id: {eq: $updatedById}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["PRINCIPAL", "principal", "COORDINATOR", "coordinator", "MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COORDINATOR", "coordinator", "MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Holiday edit requires Principal or Coordinator role") {
+      id
+      role
+      branchId
+    }
+  }
+  holiday_update(
+    id: $id
+    data: {
+      name: $name
+      date: $date
+      type: $type
+      description: $description
+      updatedBy: {id: $updatedById}
+      updatedAt_expr: "request.time"
+    }
+  )
+  auditLog_insert(
+    data: {
+      performedBy_expr: "response.query.users[0].id"
+      performedRole_expr: "response.query.users[0].role"
+      action: "HOLIDAY_UPDATED"
+      entityType: "HOLIDAY"
+      entityId_expr: "response.holiday_update.id"
+      branchId_expr: "response.query.users[0].branchId"
+      newData: "Holiday updated"
+    }
+  )
+}
+
+mutation DeleteHoliday(
+  $id: UUID!
+  $deletedById: UUID!
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {id: {eq: $deletedById}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["PRINCIPAL", "principal", "MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Holiday deletion requires Principal role") {
+      id
+      role
+      branchId
+    }
+  }
+  holiday_delete(id: $id)
+  auditLog_insert(
+    data: {
+      performedBy_expr: "response.query.users[0].id"
+      performedRole_expr: "response.query.users[0].role"
+      action: "HOLIDAY_DELETED"
+      entityType: "HOLIDAY"
+      branchId_expr: "response.query.users[0].branchId"
+      newData: "Holiday deleted"
+    }
+  )
+}
+
+# ── Attendance Correction (Coordinator / Principal) ───────────────────────────
+# Bypasses the isLocked constraint — only coordinator/principal roles allowed.
+# Writes an attendance_audit_logs record before updating the attendance row.
+mutation CorrectAttendance(
+  $id: UUID!
+  $status: String!
+  $editedById: UUID!
+  $editedByRole: String!
+  $previousStatus: String!
+  $reason: String!
+  $remarks: String
+  $studentId: UUID!
+  $sectionId: UUID!
+  $attendanceDate: Date!
+  $branchId: UUID!
+  $academicYearId: UUID
+) @auth(level: USER) @transaction {
+  query @redact {
+    # Non-MAIN_ADMIN callers must belong to the same branch as the attendance record.
+    # Dual check: (1) caller's users.branchId == $branchId, (2) attendance record's branchId == $branchId.
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {id: {eq: $editedById}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["BRANCH_ADMIN", "branch_admin", "PRINCIPAL", "principal", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["BRANCH_ADMIN", "branch_admin", "PRINCIPAL", "principal", "COORDINATOR", "coordinator"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Attendance correction requires Coordinator or Principal role within the same branch") {
+      id
+      role
+      branchId
+    }
+    # Confirm the attendance record actually belongs to the branch the caller claims
+    attendanceRecord: attendances(
+      where: {id: {eq: $id}, branchId: {eq: $branchId}}
+      limit: 1
+    ) @check(expr: "this.exists(a, true)", message: "Attendance record not found in the specified branch") {
+      id
+    }
+  }
+  attendance_update(
+    id: $id
+    data: {
+      status: $status
+      editedBy: {id: $editedById}
+      remarks: $remarks
+      editReason: $reason
+      lastEditedAt_expr: "request.time"
+      updatedAt_expr: "request.time"
+    }
+  )
+  attendanceAuditLog_insert(
+    data: {
+      attendance: {id: $id}
+      student: {id: $studentId}
+      section: {id: $sectionId}
+      branch: {id: $branchId}
+      academicYear: {id: $academicYearId}
+      attendanceDate: $attendanceDate
+      editedBy: {id: $editedById}
+      editedByRole: $editedByRole
+      previousStatus: $previousStatus
+      newStatus: $status
+      reason: $reason
+    }
+  )
+  auditLog_insert(
+    data: {
+      performedBy_expr: "response.query.users[0].id"
+      performedRole_expr: "response.query.users[0].role"
+      action: "ATTENDANCE_CORRECTED"
+      entityType: "ATTENDANCE"
+      branchId: $branchId
+      oldData: $previousStatus
+      newData: $status
+    }
+  )
+}
+
+# ── Attendance Summary Upsert ─────────────────────────────────────────────────
+mutation UpsertAttendanceSummary(
+  $studentId: UUID!
+  $branchId: UUID!
+  $sectionId: UUID!
+  $academicYearId: UUID!
+  $yearMonth: String!
+  $totalWorkingDays: Int!
+  $effectiveDays: Int!
+  $presentCount: Int!
+  $absentCount: Int!
+  $halfDayCount: Int!
+  $lateCount: Int!
+  $medicalLeaveCount: Int!
+  $approvedLeaveCount: Int!
+  $holidayCount: Int!
+  $sundayCount: Int!
+  $attendancePct: Float!
+  $academicYearPct: Float!
+) @auth(level: USER) @transaction {
+  query @redact {
+    # Only staff roles may write attendance summaries.
+    # Parents must never be able to manipulate their children's attendance percentages.
+    callerStaff: users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin", "PRINCIPAL", "principal", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin", "PRINCIPAL", "principal", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Staff role required to update attendance summaries") {
+      id
+      role
+    }
+  }
+  attendanceSummary_upsert(
+    data: {
+      student: {id: $studentId}
+      branch: {id: $branchId}
+      section: {id: $sectionId}
+      academicYear: {id: $academicYearId}
+      yearMonth: $yearMonth
+      totalWorkingDays: $totalWorkingDays
+      effectiveDays: $effectiveDays
+      presentCount: $presentCount
+      absentCount: $absentCount
+      halfDayCount: $halfDayCount
+      lateCount: $lateCount
+      medicalLeaveCount: $medicalLeaveCount
+      approvedLeaveCount: $approvedLeaveCount
+      holidayCount: $holidayCount
+      sundayCount: $sundayCount
+      attendancePct: $attendancePct
+      academicYearPct: $academicYearPct
+      lastRecalcAt_expr: "request.time"
+    }
+  )
+}
+
+# ── Attendance Alert Log ──────────────────────────────────────────────────────
+mutation CreateAttendanceAlertLog(
+  $studentId: UUID!
+  $branchId: UUID!
+  $academicYearId: UUID!
+  $threshold: Int!
+  $alertType: String!
+  $yearMonth: String
+  $currentPct: Float!
+  $sentToRoles: String!
+) @auth(level: USER) @transaction {
+  query @redact {
+    callerStaff: users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin", "PRINCIPAL", "principal", "COORDINATOR", "coordinator"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin", "PRINCIPAL", "principal", "COORDINATOR", "coordinator"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Coordinator or higher required to log attendance alerts") {
+      id
+      role
+    }
+  }
+  attendanceAlertLog_insert(
+    data: {
+      student: {id: $studentId}
+      branch: {id: $branchId}
+      academicYear: {id: $academicYearId}
+      threshold: $threshold
+      alertType: $alertType
+      yearMonth: $yearMonth
+      currentPct: $currentPct
+      sentToRoles: $sentToRoles
+    }
+  )
+}
+
+# ── Holiday — extended insert (supports isPublicHoliday + isSeeded) ───────────
+mutation CreatePublicHoliday(
+  $branchId: UUID!
+  $name: String!
+  $date: Date!
+  $type: String!
+  $description: String
+  $createdById: UUID!
+  $isPublicHoliday: Boolean!
+  $isSeeded: Boolean!
+) @auth(level: USER) @transaction {
+  query @redact {
+    # Each non-MAIN_ADMIN role is scoped to the specific $branchId they manage.
+    # Added COORDINATOR per business rules; BRANCH_ADMIN branch is via branches_on_branchAdmin.
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {id: {eq: $createdById}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Holiday creation requires Principal, Coordinator, or Main Admin for the specified branch") {
+      id
+      role
+      branchId
+    }
+  }
+  holiday_insert(
+    data: {
+      branch: {id: $branchId}
+      name: $name
+      date: $date
+      type: $type
+      description: $description
+      isPublicHoliday: $isPublicHoliday
+      isSeeded: $isSeeded
+      createdBy: {id: $createdById}
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+# ─── Marks Management & Result Publishing System ─────────────────────────────
+
+mutation CreateExam(
+  $branchId: UUID!
+  $academicYearId: UUID!
+  $name: String!
+  $examType: String!
+  $startDate: Date
+  $endDate: Date
+  $remarks: String
+  $createdById: UUID!
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["PRINCIPAL", "principal", "COORDINATOR", "coordinator", "MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COORDINATOR", "coordinator", "MAIN_ADMIN", "main_admin"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Exam creation requires Principal or Coordinator role") {
+      id
+      role
+    }
+  }
+  exam_insert(
+    data: {
+      branch: {id: $branchId}
+      academicYear: {id: $academicYearId}
+      name: $name
+      examType: $examType
+      status: "DRAFT"
+      startDate: $startDate
+      endDate: $endDate
+      remarks: $remarks
+      createdBy: {id: $createdById}
+      isActive: true
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation UpdateExam(
+  $id: UUID!
+  $name: String!
+  $examType: String!
+  $startDate: Date
+  $endDate: Date
+  $remarks: String
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["PRINCIPAL", "principal", "COORDINATOR", "coordinator", "MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COORDINATOR", "coordinator", "MAIN_ADMIN", "main_admin"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Exam update requires Principal or Coordinator role") {
+      id
+      role
+    }
+  }
+  exam_update(
+    id: $id
+    data: {
+      name: $name
+      examType: $examType
+      startDate: $startDate
+      endDate: $endDate
+      remarks: $remarks
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation ArchiveExam($id: UUID!) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["PRINCIPAL", "principal", "MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "MAIN_ADMIN", "main_admin"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Archive requires Principal role") {
+      id
+      role
+    }
+  }
+  exam_update(
+    id: $id
+    data: {status: "ARCHIVED" updatedAt_expr: "request.time"}
+  )
+}
+
+mutation DeleteExam($id: UUID!) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["PRINCIPAL", "principal", "MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "MAIN_ADMIN", "main_admin"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Delete requires Principal role") {
+      id
+      role
+    }
+  }
+  exam_update(
+    id: $id
+    data: {isActive: false updatedAt_expr: "request.time"}
+  )
+}
+
+mutation AddExamSection(
+  $examId: UUID!
+  $sectionId: UUID!
+  $academicClassId: UUID!
+  $branchId: UUID!
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["PRINCIPAL", "principal", "COORDINATOR", "coordinator", "MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COORDINATOR", "coordinator", "MAIN_ADMIN", "main_admin"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Section linking requires Principal or Coordinator role") {
+      id
+      role
+    }
+  }
+  examSection_insert(
+    data: {
+      exam: {id: $examId}
+      section: {id: $sectionId}
+      academicClass: {id: $academicClassId}
+      branch: {id: $branchId}
+      isPublished: false
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation UpsertExamSubjectConfig(
+  $examId: UUID!
+  $academicClassId: UUID!
+  $branchId: UUID!
+  $subjectName: String!
+  $maxMarks: Float!
+  $passingMarks: Float!
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["PRINCIPAL", "principal", "COORDINATOR", "coordinator", "MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COORDINATOR", "coordinator", "MAIN_ADMIN", "main_admin"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Subject config requires Principal or Coordinator role") {
+      id
+      role
+    }
+  }
+  examSubjectConfig_upsert(
+    data: {
+      exam: {id: $examId}
+      academicClass: {id: $academicClassId}
+      branch: {id: $branchId}
+      subjectName: $subjectName
+      maxMarks: $maxMarks
+      passingMarks: $passingMarks
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation UpsertStudentMark(
+  $examId: UUID!
+  $studentId: UUID!
+  $sectionId: UUID!
+  $branchId: UUID!
+  $academicYearId: UUID!
+  $subjectName: String!
+  $marksObtained: Float
+  $isAbsent: Boolean!
+  $enteredById: UUID!
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["PRINCIPAL", "principal", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher", "MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher", "MAIN_ADMIN", "main_admin"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Marks entry requires Principal, Coordinator or Teacher role") {
+      id
+      role
+    }
+  }
+  studentMark_upsert(
+    data: {
+      exam: {id: $examId}
+      student: {id: $studentId}
+      section: {id: $sectionId}
+      branch: {id: $branchId}
+      academicYear: {id: $academicYearId}
+      subjectName: $subjectName
+      marksObtained: $marksObtained
+      isAbsent: $isAbsent
+      enteredBy: {id: $enteredById}
+      lastEditedBy: {id: $enteredById}
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation PublishExamSection(
+  $examSectionId: UUID!
+  $publishedById: UUID!
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["PRINCIPAL", "principal", "COORDINATOR", "coordinator", "MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COORDINATOR", "coordinator", "MAIN_ADMIN", "main_admin"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Publishing requires Principal or Coordinator role") {
+      id
+      role
+    }
+  }
+  examSection_update(
+    id: $examSectionId
+    data: {
+      isPublished: true
+      publishedBy: {id: $publishedById}
+      publishedAt_expr: "request.time"
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation UnpublishExamSection($examSectionId: UUID!) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["PRINCIPAL", "principal", "MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "MAIN_ADMIN", "main_admin"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Unpublishing requires Principal role") {
+      id
+      role
+    }
+  }
+  examSection_update(
+    id: $examSectionId
+    data: {
+      isPublished: false
+      updatedAt_expr: "request.time"
+    }
+  )
+}
+
+mutation RecordMarksAuditLog(
+  $examId: UUID!
+  $studentId: UUID!
+  $branchId: UUID!
+  $subjectName: String!
+  $oldMarks: Float
+  $newMarks: Float
+  $changedById: UUID!
+  $changedByRole: String!
+) @auth(level: USER, insecureReason: "Marks audit log write; changedById and changedByRole are supplied from the authenticated session; role access enforced at the SaveStudentMarks level") {
+  marksAuditLog_insert(
+    data: {
+      exam: {id: $examId}
+      student: {id: $studentId}
+      branch: {id: $branchId}
+      subjectName: $subjectName
+      oldMarks: $oldMarks
+      newMarks: $newMarks
+      changedBy: {id: $changedById}
+      changedByRole: $changedByRole
+    }
+  )
+}

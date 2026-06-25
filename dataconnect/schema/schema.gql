@@ -1,0 +1,1098 @@
+# NSRIT Connect relational schema for Firebase Data Connect / SQL Connect.
+# Roles and statuses are stored as strings because Data Connect table fields are
+# safest across generated SDKs when represented as varchar values.
+
+type Branch @table(name: "branches", key: "id") @unique(fields: ["branchCode"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  name: String! @col(dataType: "varchar(120)")
+  branchCode: String! @col(dataType: "varchar(2)")
+  address: String
+  city: String @col(dataType: "varchar(80)")
+  state: String @col(dataType: "varchar(80)")
+  pincode: String @col(dataType: "varchar(12)")
+  phone: String @col(dataType: "varchar(20)")
+  email: String @col(dataType: "varchar(140)")
+  status: String! @col(dataType: "varchar(20)") @default(value: "ACTIVE")
+  branchAdmin: User
+  principal: User
+  isActive: Boolean! @default(value: true)
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type Branch {
+  branchAdminId: UUID
+  principalId: UUID
+}
+
+type Wing @table(name: "wings", key: "id") @unique(fields: ["branch", "code"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  branch: Branch!
+  name: String! @col(dataType: "varchar(80)")
+  code: String! @col(dataType: "varchar(20)")
+  isActive: Boolean! @default(value: true)
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type Wing {
+  branchId: UUID!
+}
+
+type AcademicClass @table(name: "academic_classes", key: "id") @unique(fields: ["branch", "name"]) @index(fields: ["wingId", "sortOrder"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  branch: Branch!
+  name: String! @col(dataType: "varchar(20)")
+  classCode: String @col(name: "class_code", dataType: "varchar(20)")
+  wing: Wing!
+  sortOrder: Int! @col(name: "sort_order") @default(value: 0)
+  displayOrder: Int @default(value: 0)
+  isActive: Boolean! @default(value: true)
+  activatedBy: User
+  activatedAt: Timestamp @col(name: "activated_at")
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type AcademicClass {
+  branchId: UUID!
+  wingId: UUID!
+  activatedById: UUID
+}
+
+type Section @table(name: "sections", key: "id") @unique(fields: ["branch", "academicClass", "name", "academicYear"]) @index(fields: ["branchId", "academicClassId", "academicYear"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  branch: Branch!
+  wing: Wing!
+  academicClass: AcademicClass!
+  name: String! @col(dataType: "varchar(1)")
+  academicYear: Int! @col(name: "academic_year")
+  classTeacher: User
+  isActive: Boolean! @default(value: true)
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type Section {
+  branchId: UUID!
+  wingId: UUID!
+  academicClassId: UUID!
+  classTeacherId: UUID
+}
+
+type Coordinator @table(name: "coordinators", key: "id") @index(fields: ["branchId", "wing"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  user: User!
+  branch: Branch!
+  wing: String! @col(dataType: "varchar(20)")
+  employeeId: String @col(name: "employee_id", dataType: "varchar(40)") @unique
+  staffType: String @col(name: "staff_type", dataType: "varchar(20)")
+  gender: String @col(dataType: "varchar(20)")
+  email: String @col(dataType: "varchar(140)")
+  isActive: Boolean! @default(value: true)
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type Coordinator {
+  userId: UUID!
+  branchId: UUID!
+}
+
+type User @table(name: "users", key: "id") {
+  id: UUID! @default(expr: "uuidV4()")
+  firebaseUID: String! @col(dataType: "varchar(128)")
+  fullName: String! @col(dataType: "varchar(140)")
+  countryCode: String! @col(dataType: "varchar(5)")
+  phoneNumber: String! @col(dataType: "varchar(20)")
+  status: String! @col(dataType: "varchar(20)") @default(value: "ACTIVE")
+  # Legacy rollout field. New authorization and switching logic should read UserRole.
+  role: String! @col(dataType: "varchar(30)")
+  employeeId: String @col(name: "employee_id", dataType: "varchar(40)") @unique
+  staffType: String @col(name: "staff_type", dataType: "varchar(20)")
+  branch: Branch
+  wing: Wing
+  isActive: Boolean! @default(value: true)
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type User {
+  branchId: UUID
+  wingId: UUID
+}
+
+type UserRole @table(name: "user_roles", key: ["user", "role"]) @index(fields: ["userId", "role"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  user: User!
+  role: String! @col(dataType: "varchar(30)")
+  createdAt: Timestamp! @col(name: "created_at") @default(expr: "request.time")
+}
+
+extend type UserRole {
+  userId: UUID!
+}
+
+type Parent @table(name: "parents", key: "id") {
+  id: UUID! @default(expr: "uuidV4()")
+  user: User
+  branch: Branch!
+  fullName: String! @col(dataType: "varchar(140)")
+  fatherName: String @col(dataType: "varchar(140)")
+  motherName: String @col(dataType: "varchar(140)")
+  countryCode: String! @col(dataType: "varchar(5)")
+  phoneNumber: String! @col(dataType: "varchar(20)")
+  email: String @col(dataType: "varchar(140)")
+  address: String
+  isActive: Boolean! @default(value: true)
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type Parent {
+  userId: UUID
+  branchId: UUID!
+}
+
+type StudentIdSequence
+  @table(name: "student_id_sequences", key: ["admissionYear", "branchCode"]) {
+  admissionYear: Int!
+  branchCode: String! @col(dataType: "varchar(2)")
+  lastSerialNumber: Int! @default(value: 0)
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type StudentSequence
+  @table(name: "student_sequences", key: ["year", "branchCode"]) {
+  year: Int!
+  branchCode: String! @col(name: "branch_code", dataType: "varchar(2)")
+  lastSerial: Int! @col(name: "last_serial") @default(value: 0)
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type StaffIdSequence
+  @table(name: "staff_id_sequences", key: ["joiningYear", "branchCode", "staffType"]) {
+  joiningYear: Int!
+  branchCode: String! @col(dataType: "varchar(2)")
+  staffType: String! @col(name: "staff_type", dataType: "varchar(20)")
+  lastSerialNumber: Int! @default(value: 0)
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type EmployeeSequence
+  @table(name: "employee_sequences", key: ["year", "branchCode", "staffType"]) {
+  year: Int!
+  branchCode: String! @col(name: "branch_code", dataType: "varchar(2)")
+  staffType: String! @col(name: "staff_type", dataType: "varchar(20)")
+  lastSequence: Int! @col(name: "last_sequence") @default(value: 0)
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type Teacher @table(name: "teachers", key: "id") @unique(fields: ["user"]) @index(fields: ["branchId"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  user: User!
+  employeeId: String! @col(name: "employee_id", dataType: "varchar(40)") @unique
+  staffType: String! @col(name: "staff_type", dataType: "varchar(20)") @default(value: "TEACHING")
+  branch: Branch!
+  # Deprecated: teachers are branch-level resources. Keep nullable for safe migration.
+  wing: String @col(dataType: "varchar(20)")
+  joiningDate: Date! @col(name: "joining_date")
+  designation: String! @col(dataType: "varchar(80)")
+  gender: String! @col(dataType: "varchar(20)")
+  alternateMobileNumber: String @col(name: "alternate_mobile_number", dataType: "varchar(20)")
+  email: String @col(dataType: "varchar(140)")
+  dateOfBirth: Date @col(name: "date_of_birth")
+  qualification: String @col(dataType: "varchar(140)")
+  experience: String @col(dataType: "varchar(80)")
+  address: String
+  city: String @col(dataType: "varchar(80)")
+  state: String @col(dataType: "varchar(80)")
+  pincode: String @col(dataType: "varchar(12)")
+  emergencyContact: String @col(name: "emergency_contact", dataType: "varchar(20)")
+  bloodGroup: String @col(name: "blood_group", dataType: "varchar(10)")
+  isActive: Boolean! @default(value: true)
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type Teacher {
+  userId: UUID!
+  branchId: UUID!
+}
+
+type Accountant @table(name: "accountants", key: "id") @unique(fields: ["user"]) @index(fields: ["branchId"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  user: User!
+  employeeId: String! @col(name: "employee_id", dataType: "varchar(40)") @unique
+  staffType: String! @col(name: "staff_type", dataType: "varchar(20)") @default(value: "SUPPORTING")
+  branch: Branch!
+  joiningDate: Date! @col(name: "joining_date")
+  designation: String! @col(dataType: "varchar(80)")
+  gender: String! @col(dataType: "varchar(20)")
+  email: String @col(dataType: "varchar(140)")
+  qualification: String @col(dataType: "varchar(140)")
+  experience: String @col(dataType: "varchar(80)")
+  address: String
+  city: String @col(dataType: "varchar(80)")
+  state: String @col(dataType: "varchar(80)")
+  pincode: String @col(dataType: "varchar(12)")
+  emergencyContact: String @col(name: "emergency_contact", dataType: "varchar(20)")
+  bloodGroup: String @col(name: "blood_group", dataType: "varchar(10)")
+  isActive: Boolean! @default(value: true)
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type Accountant {
+  userId: UUID!
+  branchId: UUID!
+}
+
+type Subject @table(name: "subjects", key: "id") @unique(fields: ["code"]) @index(fields: ["status"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  name: String! @col(dataType: "varchar(120)")
+  code: String! @col(dataType: "varchar(30)")
+  status: String! @col(dataType: "varchar(20)") @default(value: "ACTIVE")
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type TeacherSubject @table(name: "teacher_subjects", key: "id") @unique(fields: ["teacher", "subject"]) @index(fields: ["teacherId"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  teacher: Teacher!
+  subject: Subject!
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type TeacherSubject {
+  teacherId: UUID!
+  subjectId: UUID!
+}
+
+type TeacherSectionAssignment @table(name: "teacher_section_assignments", key: "id") @unique(fields: ["teacher", "section", "isClassTeacher"]) @index(fields: ["sectionId", "isClassTeacher"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  teacher: Teacher!
+  section: Section!
+  assignedBy: User
+  isClassTeacher: Boolean! @col(name: "is_class_teacher") @default(value: false)
+  isActive: Boolean! @default(value: true)
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type TeacherSectionAssignment {
+  teacherId: UUID!
+  sectionId: UUID!
+  assignedById: UUID
+}
+
+type TeacherTransferHistory @table(name: "teacher_transfer_history", key: "id") @index(fields: ["teacherId", "changedAt"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  teacher: Teacher!
+  oldWing: String! @col(name: "old_wing", dataType: "varchar(20)")
+  newWing: String! @col(name: "new_wing", dataType: "varchar(20)")
+  changedBy: User!
+  changedAt: Timestamp! @col(name: "changed_at") @default(expr: "request.time")
+}
+
+extend type TeacherTransferHistory {
+  teacherId: UUID!
+  changedById: UUID!
+}
+
+type Student @table(name: "students", key: "id") {
+  id: UUID! @default(expr: "uuidV4()")
+  studentId: String! @col(dataType: "varchar(10)") @unique
+  admissionYear: Int!
+  branchCode: String! @col(dataType: "varchar(2)")
+  serialNumber: Int!
+  fullName: String! @col(dataType: "varchar(140)")
+  gender: String @col(dataType: "varchar(20)")
+  dateOfBirth: Date
+  photoUrl: String
+  aadhaarNumber: String @col(name: "aadhaar_number", dataType: "varchar(20)")
+  bloodGroup: String @col(dataType: "varchar(10)")
+  branch: Branch!
+  wing: Wing
+  academicClass: AcademicClass!
+  section: Section!
+  parent: Parent!
+  rollNumber: String @col(dataType: "varchar(30)")
+  countryCode: String @col(dataType: "varchar(5)")
+  phoneNumber: String @col(dataType: "varchar(20)")
+  address: String
+  city: String @col(dataType: "varchar(80)")
+  state: String @col(dataType: "varchar(80)")
+  pincode: String @col(dataType: "varchar(12)")
+  emergencyContact: String @col(name: "emergency_contact", dataType: "varchar(20)")
+  transportRequired: Boolean @col(name: "transport_required") @default(value: false)
+  aadhaarDocumentUrl: String
+  transferCertificateUrl: String
+  birthCertificateUrl: String
+  admissionDate: Date!
+  status: String! @col(dataType: "varchar(20)") @default(value: "ACTIVE")
+  isActive: Boolean! @default(value: true)
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type Student {
+  branchId: UUID!
+  wingId: UUID
+  academicClassId: UUID!
+  sectionId: UUID!
+  parentId: UUID!
+}
+
+type StudentParent @table(name: "student_parents", key: ["student", "user", "relationship"]) @index(fields: ["studentId"]) @index(fields: ["userId"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  student: Student!
+  user: User!
+  relationship: String! @col(dataType: "varchar(20)")
+  createdAt: Timestamp! @col(name: "created_at") @default(expr: "request.time")
+}
+
+extend type StudentParent {
+  studentId: UUID!
+  userId: UUID!
+}
+
+type StudentSectionHistory @table(name: "student_section_history", key: "id") @index(fields: ["studentId", "changedAt"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  student: Student!
+  oldSection: Section!
+  newSection: Section!
+  changedBy: User!
+  changedAt: Timestamp! @col(name: "changed_at") @default(expr: "request.time")
+}
+
+extend type StudentSectionHistory {
+  studentId: UUID!
+  oldSectionId: UUID!
+  newSectionId: UUID!
+  changedById: UUID!
+}
+
+type StudentPromotionHistory @table(name: "student_promotion_history", key: "id") @index(fields: ["studentId", "promotedAt"]) @index(fields: ["branchId", "academicYear"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  branch: Branch!
+  student: Student!
+  fromClass: AcademicClass!
+  toClass: AcademicClass
+  fromSection: Section!
+  toSection: Section
+  promotionStatus: String! @col(name: "promotion_status", dataType: "varchar(20)") @default(value: "PROMOTED")
+  academicYear: Int! @col(name: "academic_year")
+  promotedBy: User!
+  promotedAt: Timestamp! @col(name: "promoted_at") @default(expr: "request.time")
+  remarks: String
+}
+
+extend type StudentPromotionHistory {
+  branchId: UUID!
+  studentId: UUID!
+  fromClassId: UUID!
+  toClassId: UUID
+  fromSectionId: UUID!
+  toSectionId: UUID
+  promotedById: UUID!
+}
+
+type TeacherAssignment @table(name: "teacher_assignments", key: "id") {
+  id: UUID! @default(expr: "uuidV4()")
+  teacher: User!
+  branch: Branch!
+  # Deprecated: assignment wing is derived from section/class.
+  wing: Wing
+  academicClass: AcademicClass!
+  section: Section!
+  subjectName: String @col(dataType: "varchar(80)")
+  isClassTeacher: Boolean! @default(value: false)
+  isActive: Boolean! @default(value: true)
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type TeacherAssignment {
+  teacherId: UUID!
+  branchId: UUID!
+  wingId: UUID
+  academicClassId: UUID!
+  sectionId: UUID!
+}
+
+type Attendance @table(name: "attendance", key: "id")
+  @index(fields: ["studentId", "attendanceDate"])
+  @index(fields: ["branchId", "attendanceDate"])
+  @index(fields: ["academicYearId", "sectionId"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  student: Student!
+  academicClass: AcademicClass!
+  section: Section!
+  branch: Branch
+  academicYear: AcademicYear
+  attendanceDate: Date!
+  # PRESENT | ABSENT | HALF_DAY | LATE | MEDICAL_LEAVE | APPROVED_LEAVE
+  # HOLIDAY | SUNDAY_HOLIDAY | PUBLIC_HOLIDAY | SCHOOL_HOLIDAY
+  status: String! @col(dataType: "varchar(30)")
+  halfDaySession: String @col(name: "half_day_session", dataType: "varchar(20)")
+  # Locked immediately on first save — no re-submission allowed
+  isLocked: Boolean! @default(value: false) @col(name: "is_locked")
+  lockedAt: Timestamp @col(name: "locked_at")
+  markedBy: User!
+  editedBy: User
+  remarks: String
+  editReason: String @col(name: "edit_reason", dataType: "varchar(500)")
+  lastEditedAt: Timestamp @col(name: "last_edited_at")
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type Attendance {
+  studentId: UUID!
+  academicClassId: UUID!
+  sectionId: UUID!
+  branchId: UUID
+  academicYearId: UUID
+  markedById: UUID!
+  editedById: UUID
+}
+
+# Audit trail for every coordinator/principal edit on attendance records.
+# INSERT-ONLY — never update or delete.
+type AttendanceAuditLog
+  @table(name: "attendance_audit_logs", key: "id")
+  @index(fields: ["attendanceId"])
+  @index(fields: ["studentId", "attendanceDate"])
+  @index(fields: ["editedById", "editedAt"])
+  @index(fields: ["branchId", "editedAt"])
+  @index(fields: ["sectionId", "attendanceDate"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  attendance: Attendance!
+  student: Student!
+  section: Section!
+  branch: Branch!
+  academicYear: AcademicYear
+  attendanceDate: Date!
+  editedBy: User!
+  editedByRole: String! @col(name: "edited_by_role", dataType: "varchar(30)")
+  previousStatus: String! @col(name: "previous_status", dataType: "varchar(30)")
+  newStatus: String! @col(name: "new_status", dataType: "varchar(30)")
+  reason: String! @col(dataType: "varchar(500)")
+  editedAt: Timestamp! @col(name: "edited_at") @default(expr: "request.time")
+}
+
+extend type AttendanceAuditLog {
+  attendanceId: UUID!
+  studentId: UUID!
+  sectionId: UUID!
+  branchId: UUID!
+  academicYearId: UUID
+  editedById: UUID!
+}
+
+# Pre-calculated monthly summaries per student — cache layer for Parent Dashboard and Reports.
+# Upserted after every attendance submission or correction.
+type AttendanceSummary
+  @table(name: "attendance_summaries", key: ["student", "yearMonth", "academicYear"])
+  @index(fields: ["sectionId", "yearMonth"])
+  @index(fields: ["branchId", "yearMonth"])
+  @index(fields: ["branchId", "academicYearId", "attendancePct"]) {
+  student: Student!
+  branch: Branch!
+  section: Section!
+  academicYear: AcademicYear!
+  yearMonth: String! @col(name: "year_month", dataType: "varchar(7)")
+  totalWorkingDays: Int! @col(name: "total_working_days") @default(value: 0)
+  effectiveDays: Int! @col(name: "effective_days") @default(value: 0)
+  presentCount: Int! @col(name: "present_count") @default(value: 0)
+  absentCount: Int! @col(name: "absent_count") @default(value: 0)
+  halfDayCount: Int! @col(name: "half_day_count") @default(value: 0)
+  lateCount: Int! @col(name: "late_count") @default(value: 0)
+  medicalLeaveCount: Int! @col(name: "medical_leave_count") @default(value: 0)
+  approvedLeaveCount: Int! @col(name: "approved_leave_count") @default(value: 0)
+  holidayCount: Int! @col(name: "holiday_count") @default(value: 0)
+  sundayCount: Int! @col(name: "sunday_count") @default(value: 0)
+  attendancePct: Float! @col(name: "attendance_pct") @default(value: 0.0)
+  academicYearPct: Float! @col(name: "academic_year_pct") @default(value: 0.0)
+  lastRecalcAt: Timestamp! @col(name: "last_recalc_at") @default(expr: "request.time")
+}
+
+extend type AttendanceSummary {
+  studentId: UUID!
+  branchId: UUID!
+  sectionId: UUID!
+  academicYearId: UUID!
+}
+
+# Tracks which low-attendance alerts have been sent — prevents duplicate notifications.
+type AttendanceAlertLog
+  @table(name: "attendance_alert_logs", key: "id")
+  @index(fields: ["studentId", "threshold", "yearMonth"])
+  @index(fields: ["branchId", "sentAt"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  student: Student!
+  branch: Branch!
+  academicYear: AcademicYear!
+  threshold: Int!
+  alertType: String! @col(name: "alert_type", dataType: "varchar(20)")
+  yearMonth: String @col(name: "year_month", dataType: "varchar(7)")
+  currentPct: Float! @col(name: "current_pct")
+  sentToRoles: String! @col(name: "sent_to_roles", dataType: "varchar(200)")
+  sentAt: Timestamp! @col(name: "sent_at") @default(expr: "request.time")
+  recovered: Boolean! @default(value: false)
+  recoveredAt: Timestamp @col(name: "recovered_at")
+}
+
+extend type AttendanceAlertLog {
+  studentId: UUID!
+  branchId: UUID!
+  academicYearId: UUID!
+}
+
+# Branch-specific holidays — controls orange calendar cells and disables attendance.
+# type: NATIONAL | STATE | SCHOOL | FESTIVAL | EMERGENCY
+type Holiday @table(name: "holidays", key: "id") @index(fields: ["branchId", "date"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  branch: Branch!
+  name: String! @col(dataType: "varchar(140)")
+  date: Date!
+  type: String! @col(dataType: "varchar(30)") @default(value: "SCHOOL")
+  description: String @col(dataType: "varchar(300)")
+  isPublicHoliday: Boolean! @col(name: "is_public_holiday") @default(value: false)
+  isSeeded: Boolean! @col(name: "is_seeded") @default(value: false)
+  createdBy: User!
+  updatedBy: User
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type Holiday {
+  branchId: UUID!
+  createdById: UUID!
+  updatedById: UUID
+}
+
+type FeeStructure @table(name: "fee_structures", key: "id") {
+  id: UUID! @default(expr: "uuidV4()")
+  branch: Branch!
+  academicClass: AcademicClass!
+  academicYear: Int!
+  feeName: String! @col(dataType: "varchar(100)")
+  totalAmount: Float!
+  dueDate: Date!
+  isActive: Boolean! @default(value: true)
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type FeeStructure {
+  branchId: UUID!
+  academicClassId: UUID!
+}
+
+type StudentFee @table(name: "student_fees", key: "id") {
+  id: UUID! @default(expr: "uuidV4()")
+  student: Student!
+  feeStructure: FeeStructure!
+  totalFee: Float!
+  paidAmount: Float! @default(value: 0)
+  remainingAmount: Float!
+  status: String! @col(dataType: "varchar(20)")
+  dueDate: Date!
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type StudentFee {
+  studentId: UUID!
+  feeStructureId: UUID!
+}
+
+type Payment @table(name: "payments", key: "id") {
+  id: UUID! @default(expr: "uuidV4()")
+  student: Student!
+  studentFee: StudentFee!
+  amount: Float!
+  paymentMode: String! @col(dataType: "varchar(30)")
+  receiptNumber: String @col(dataType: "varchar(80)")
+  uploadedBy: User!
+  remarks: String
+  paidAt: Timestamp! @default(expr: "request.time")
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type Payment {
+  studentId: UUID!
+  studentFeeId: UUID!
+  uploadedById: UUID!
+}
+
+type FeeCategory @table(name: "fee_categories", key: "id") @unique(fields: ["name"]) @index(fields: ["status"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  name: String! @col(dataType: "varchar(120)")
+  status: String! @col(dataType: "varchar(20)") @default(value: "ACTIVE")
+  createdAt: Timestamp! @col(name: "created_at") @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type AcademicYearFeeTemplate
+  @table(name: "academic_year_fee_templates", key: "id")
+  @unique(fields: ["branch", "academicClass", "academicYear"])
+  @index(fields: ["branchId", "academicYear"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  branch: Branch!
+  academicClass: AcademicClass!
+  academicYear: Int! @col(name: "academic_year")
+  term1Fee: Float! @col(name: "term1_fee") @default(value: 0)
+  term2Fee: Float! @col(name: "term2_fee") @default(value: 0)
+  term3Fee: Float! @col(name: "term3_fee") @default(value: 0)
+  totalTuitionFee: Float! @col(name: "total_tuition_fee") @default(value: 0)
+  applyToFuture: Boolean! @col(name: "apply_to_future") @default(value: true)
+  status: String! @col(dataType: "varchar(20)") @default(value: "ACTIVE")
+  createdBy: User!
+  createdAt: Timestamp! @col(name: "created_at") @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type AcademicYearFeeTemplate {
+  branchId: UUID!
+  academicClassId: UUID!
+  createdById: UUID!
+}
+
+type StudentFeePlan @table(name: "student_fee_plans", key: "id") @unique(fields: ["student", "academicYear"]) @index(fields: ["studentId", "academicYear"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  student: Student!
+  classFeeTemplate: AcademicYearFeeTemplate
+  academicYear: Int! @col(name: "academic_year")
+  term1Fee: Float! @col(name: "term1_fee") @default(value: 0)
+  term2Fee: Float! @col(name: "term2_fee") @default(value: 0)
+  term3Fee: Float! @col(name: "term3_fee") @default(value: 0)
+  booksFee: Float! @col(name: "books_fee") @default(value: 0)
+  transportFee: Float! @col(name: "transport_fee") @default(value: 0)
+  concessionType: String @col(name: "concession_type", dataType: "varchar(20)")
+  concessionValue: Float! @col(name: "concession_value") @default(value: 0)
+  concessionAmount: Float! @col(name: "concession_amount") @default(value: 0)
+  grossAmount: Float! @col(name: "gross_amount") @default(value: 0)
+  totalAmount: Float! @col(name: "total_amount")
+  # Carry-forward dues from prior academic years. previousYearDue is the
+  # outstanding balance carried into this plan when the student was promoted;
+  # carryForwardAmount mirrors it for reporting/back-compat. Both default to 0
+  # for plans created without a prior-year balance.
+  previousYearDue: Float! @col(name: "previous_year_due") @default(value: 0)
+  carryForwardAmount: Float! @col(name: "carry_forward_amount") @default(value: 0)
+  createdBy: User!
+  isActive: Boolean! @default(value: true)
+  createdAt: Timestamp! @col(name: "created_at") @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type StudentFeePlan {
+  studentId: UUID!
+  classFeeTemplateId: UUID
+  createdById: UUID!
+}
+
+type StudentFeeItem @table(name: "student_fee_items", key: "id") @unique(fields: ["feePlan", "category"]) @index(fields: ["feePlanId"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  feePlan: StudentFeePlan!
+  category: FeeCategory!
+  amount: Float!
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type StudentFeeItem {
+  feePlanId: UUID!
+  categoryId: UUID!
+}
+
+type FeePayment @table(name: "fee_payments", key: "id") @unique(fields: ["receiptNumber"]) @index(fields: ["studentId", "paymentDate"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  student: Student!
+  feePlan: StudentFeePlan!
+  amount: Float!
+  paymentDate: Date! @col(name: "payment_date")
+  paymentMode: String! @col(name: "payment_mode", dataType: "varchar(30)")
+  referenceNumber: String @col(name: "reference_number", dataType: "varchar(80)")
+  receiptNumber: String! @col(name: "receipt_number", dataType: "varchar(80)")
+  remarks: String
+  # Academic year this payment applies to. Nullable for legacy rows recorded
+  # before the field existed; new payments always populate it from the fee plan.
+  academicYear: Int @col(name: "academic_year")
+  collectedBy: User!
+  status: String! @col(dataType: "varchar(20)") @default(value: "RECORDED")
+  reversedBy: User
+  reversedAt: Timestamp @col(name: "reversed_at")
+  reverseReason: String @col(name: "reverse_reason")
+  createdAt: Timestamp! @col(name: "created_at") @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type FeePayment {
+  studentId: UUID!
+  feePlanId: UUID!
+  collectedById: UUID!
+  reversedById: UUID
+}
+
+type ReceiptSequence @table(name: "receipt_sequences", key: ["year", "branchCode"]) {
+  year: Int!
+  branchCode: String! @col(name: "branch_code", dataType: "varchar(2)")
+  lastSequence: Int! @col(name: "last_sequence") @default(value: 0)
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type FeeAuditLog @table(name: "fee_audit_logs", key: "id") @index(fields: ["studentId", "createdAt"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  user: User!
+  role: String @col(dataType: "varchar(30)")
+  action: String! @col(dataType: "varchar(40)")
+  student: Student!
+  oldValue: String @col(name: "old_value")
+  newValue: String @col(name: "new_value")
+  createdAt: Timestamp! @col(name: "created_at") @default(expr: "request.time")
+}
+
+extend type FeeAuditLog {
+  userId: UUID!
+  studentId: UUID!
+}
+
+type AuditLog @table(name: "audit_logs", key: "id") @index(fields: ["branchId", "createdAt"]) @index(fields: ["performedBy", "createdAt"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  user: User
+  performedBy: String! @col(name: "performed_by", dataType: "varchar(128)")
+  performedRole: String! @col(name: "performed_role", dataType: "varchar(30)")
+  actingAs: String @col(name: "acting_as", dataType: "varchar(30)")
+  branchId: UUID @col(name: "branch_id")
+  action: String! @col(dataType: "varchar(80)")
+  entityType: String @col(name: "entity_type", dataType: "varchar(80)")
+  entityId: String @col(name: "entity_id", dataType: "varchar(120)")
+  oldRole: String @col(name: "old_role", dataType: "varchar(30)")
+  newRole: String @col(name: "new_role", dataType: "varchar(30)")
+  oldData: String @col(name: "old_data")
+  newData: String @col(name: "new_data")
+  userId: UUID @col(name: "user_id")
+  createdAt: Timestamp! @col(name: "created_at") @default(expr: "request.time")
+}
+
+
+type DueTracking @table(name: "due_tracking", key: "id") {
+  id: UUID! @default(expr: "uuidV4()")
+  student: Student!
+  studentFee: StudentFee!
+  dueAmount: Float!
+  dueDate: Date!
+  status: String! @col(dataType: "varchar(20)")
+  lastReminderAt: Timestamp
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type DueTracking {
+  studentId: UUID!
+  studentFeeId: UUID!
+}
+
+type Notification @table(name: "notifications", key: "id") {
+  id: UUID! @default(expr: "uuidV4()")
+  branch: Branch
+  user: User
+  title: String! @col(dataType: "varchar(140)")
+  message: String!
+  audienceRole: String @col(dataType: "varchar(30)")
+  # Identity of the staff member who created/broadcast this notification, used
+  # so the author (and MAIN_ADMIN) can delete it. Nullable: system-generated
+  # notifications (e.g. fee/attendance alerts) may have no human author.
+  createdBy: User
+  createdByRole: String @col(name: "created_by_role", dataType: "varchar(30)")
+  # Category tag for filtering (e.g. FEE_DUE, FEE_RECEIPT, ATTENDANCE, BROADCAST).
+  category: String @col(dataType: "varchar(30)")
+  # Academic year the notification relates to, for year-scoped history.
+  academicYear: Int @col(name: "academic_year")
+  isRead: Boolean! @default(value: false)
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type Notification {
+  branchId: UUID
+  userId: UUID
+  createdById: UUID
+}
+
+# School notice board — branch-wide announcements posted by Principal / Coordinator.
+# Distinct from Notification (which is per-user in-app alerts).
+type Notice @table(name: "notices", key: "id") @index(fields: ["branchId", "createdAt"]) @index(fields: ["branchId", "category", "createdAt"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  branch: Branch!
+  author: User
+  title: String! @col(dataType: "varchar(200)")
+  body: String!
+  category: String! @col(dataType: "varchar(30)") @default(value: "Academic")
+  pinned: Boolean! @default(value: false)
+  date: Date!
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type Notice {
+  branchId: UUID!
+  authorId: UUID
+}
+
+# One row per period slot in a section's weekly timetable.
+# Unique on (sectionId, day, periodNum) — upsert replaces a slot without knowing the row id.
+type TimetablePeriod @table(name: "timetable_periods", key: ["section", "day", "periodNum"]) @index(fields: ["sectionId", "day"]) @index(fields: ["teacherId", "day"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  section: Section!
+  branch: Branch!
+  teacher: Teacher
+  day: String! @col(dataType: "varchar(15)")
+  periodNum: Int! @col(name: "period_num")
+  subject: String @col(dataType: "varchar(80)")
+  teacherName: String @col(name: "teacher_name", dataType: "varchar(120)")
+  room: String @col(dataType: "varchar(40)")
+  status: String @col(dataType: "varchar(20)") @default(value: "DRAFT")
+  startTime: String @col(name: "start_time", dataType: "varchar(8)")
+  endTime: String @col(name: "end_time", dataType: "varchar(8)")
+  timetableType: String @col(name: "timetable_type", dataType: "varchar(20)") @default(value: "REGULAR")
+  publishedAt: Timestamp @col(name: "published_at")
+  publishedBy: User
+  isActive: Boolean! @default(value: true)
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type TimetablePeriod {
+  sectionId: UUID!
+  branchId: UUID!
+  teacherId: UUID
+  publishedById: UUID
+}
+
+type Suggestion @table(name: "suggestions", key: "id") {
+  id: UUID! @default(expr: "uuidV4()")
+  parent: Parent!
+  student: Student
+  branch: Branch!
+  title: String! @col(dataType: "varchar(140)")
+  message: String!
+  status: String! @col(dataType: "varchar(30)")
+  response: String
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type Suggestion {
+  parentId: UUID!
+  studentId: UUID
+  branchId: UUID!
+}
+
+# Academic year for a branch — controls when attendance is open and drives promotions.
+# One row per year per branch. Only one row may have isActive=true at a time (enforced in mutation).
+type AcademicYear @table(name: "academic_years", key: "id") @unique(fields: ["branch", "startYear"]) @index(fields: ["branchId", "isActive"]) @index(fields: ["branchId", "startYear"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  branch: Branch!
+  name: String! @col(dataType: "varchar(20)")
+  startYear: Int! @col(name: "start_year")
+  startDate: Date! @col(name: "start_date")
+  endDate: Date! @col(name: "end_date")
+  status: String! @col(dataType: "varchar(20)") @default(value: "PLANNING")
+  isActive: Boolean! @default(value: false)
+  createdBy: User
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type AcademicYear {
+  branchId: UUID!
+  createdById: UUID
+}
+
+# Snapshot of a section's timetable before year rollover. INSERT-ONLY.
+type TimetableArchive
+  @table(name: "timetable_archives", key: "id")
+  @index(fields: ["sectionId", "academicYear"])
+  @index(fields: ["branchId", "academicYear"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  section: Section!
+  branch: Branch!
+  teacher: Teacher
+  academicYear: Int! @col(name: "academic_year")
+  day: String! @col(dataType: "varchar(15)")
+  periodNum: Int! @col(name: "period_num")
+  subject: String @col(dataType: "varchar(80)")
+  teacherName: String @col(name: "teacher_name", dataType: "varchar(120)")
+  room: String @col(dataType: "varchar(40)")
+  archivedAt: Timestamp! @col(name: "archived_at")
+}
+
+extend type TimetableArchive {
+  sectionId: UUID!
+  branchId: UUID!
+  teacherId: UUID
+}
+
+# Per-student promotion record written during year rollover. INSERT-ONLY.
+# Composite primary key (student, academicYear) enables idempotent upsert —
+# re-running promotion for the same student+year is safe.
+type StudentAcademicHistory
+  @table(name: "student_academic_history", key: ["student", "academicYear"])
+  @index(fields: ["studentId", "academicYear"])
+  @index(fields: ["branchId", "academicYear"]) {
+  id: UUID @col(name: "id")
+  student: Student!
+  section: Section!
+  academicClass: AcademicClass!
+  branch: Branch!
+  promotedBy: User
+  promotedToSection: Section
+  academicYear: Int! @col(name: "academic_year")
+  promotionStatus: String! @col(name: "promotion_status", dataType: "varchar(30)")
+  promotedAt: Timestamp @col(name: "promoted_at")
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type StudentAcademicHistory {
+  studentId: UUID!
+  sectionId: UUID!
+  academicClassId: UUID!
+  branchId: UUID!
+  promotedById: UUID
+  promotedToSectionId: UUID
+}
+
+# ─── Marks Management & Result Publishing System ─────────────────────────────
+# Exam configuration per branch per academic year.
+# status: DRAFT | PUBLISHED | ARCHIVED
+type Exam
+  @table(name: "exams", key: "id")
+  @unique(fields: ["branch", "academicYear", "name"])
+  @index(fields: ["branchId", "academicYearId", "status"])
+  @index(fields: ["branchId", "isActive"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  branch: Branch!
+  academicYear: AcademicYear!
+  name: String! @col(dataType: "varchar(140)")
+  examType: String! @col(name: "exam_type", dataType: "varchar(30)")
+  status: String! @col(dataType: "varchar(20)") @default(value: "DRAFT")
+  startDate: Date @col(name: "start_date")
+  endDate: Date @col(name: "end_date")
+  remarks: String
+  createdBy: User!
+  isActive: Boolean! @default(value: true)
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type Exam {
+  branchId: UUID!
+  academicYearId: UUID!
+  createdById: UUID!
+}
+
+# Links an exam to a specific section and tracks per-section publish state.
+type ExamSection
+  @table(name: "exam_sections", key: "id")
+  @unique(fields: ["exam", "section"])
+  @index(fields: ["examId", "isPublished"])
+  @index(fields: ["sectionId", "isPublished"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  exam: Exam!
+  section: Section!
+  academicClass: AcademicClass!
+  branch: Branch!
+  isPublished: Boolean! @col(name: "is_published") @default(value: false)
+  publishedBy: User
+  publishedAt: Timestamp @col(name: "published_at")
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type ExamSection {
+  examId: UUID!
+  sectionId: UUID!
+  academicClassId: UUID!
+  branchId: UUID!
+  publishedById: UUID
+}
+
+# Max marks and passing marks per subject per exam per class.
+type ExamSubjectConfig
+  @table(name: "exam_subject_configs", key: ["examId", "academicClassId", "subjectName"])
+  @index(fields: ["examId", "academicClassId"]) {
+  exam: Exam!
+  academicClass: AcademicClass!
+  branch: Branch!
+  subjectName: String! @col(name: "subject_name", dataType: "varchar(120)")
+  maxMarks: Float! @col(name: "max_marks")
+  passingMarks: Float! @col(name: "passing_marks")
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type ExamSubjectConfig {
+  examId: UUID!
+  academicClassId: UUID!
+  branchId: UUID!
+}
+
+# One row per student × exam × subject. Upserted on every marks save.
+# marksObtained is nullable — null means marks not yet entered.
+type StudentMark
+  @table(name: "student_marks", key: ["examId", "studentId", "subjectName"])
+  @index(fields: ["examId", "sectionId"])
+  @index(fields: ["studentId", "examId"])
+  @index(fields: ["branchId", "academicYearId"]) {
+  exam: Exam!
+  student: Student!
+  section: Section!
+  branch: Branch!
+  academicYear: AcademicYear!
+  subjectName: String! @col(name: "subject_name", dataType: "varchar(120)")
+  marksObtained: Float @col(name: "marks_obtained")
+  isAbsent: Boolean! @col(name: "is_absent") @default(value: false)
+  enteredBy: User!
+  lastEditedBy: User
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+extend type StudentMark {
+  examId: UUID!
+  studentId: UUID!
+  sectionId: UUID!
+  branchId: UUID!
+  academicYearId: UUID!
+  enteredById: UUID!
+  lastEditedById: UUID
+}
+
+# INSERT-ONLY audit trail for every marks change.
+type MarksAuditLog
+  @table(name: "marks_audit_logs", key: "id")
+  @index(fields: ["examId", "studentId"])
+  @index(fields: ["branchId", "changedAt"]) {
+  id: UUID! @default(expr: "uuidV4()")
+  exam: Exam!
+  student: Student!
+  branch: Branch!
+  subjectName: String! @col(name: "subject_name", dataType: "varchar(120)")
+  oldMarks: Float @col(name: "old_marks")
+  newMarks: Float @col(name: "new_marks")
+  changedBy: User!
+  changedByRole: String! @col(name: "changed_by_role", dataType: "varchar(30)")
+  changedAt: Timestamp! @col(name: "changed_at") @default(expr: "request.time")
+}
+
+extend type MarksAuditLog {
+  examId: UUID!
+  studentId: UUID!
+  branchId: UUID!
+  changedById: UUID!
+}
+

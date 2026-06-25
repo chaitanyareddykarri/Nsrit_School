@@ -1,0 +1,30 @@
+diff --git a/node_modules/react-native-reanimated/android/CMakeLists.txt b/node_modules/react-native-reanimated/android/CMakeLists.txt
+index fec9e8b..89f962f 100644
+--- a/node_modules/react-native-reanimated/android/CMakeLists.txt
++++ b/node_modules/react-native-reanimated/android/CMakeLists.txt
+@@ -2,6 +2,7 @@ project(Reanimated)
+ cmake_minimum_required(VERSION 3.16)
+ 
+ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
++set(CMAKE_ANDROID_STL_TYPE c++_shared)
+ 
+ set(CMAKE_CXX_STANDARD 20)
+ 
+@@ -99,3 +100,5 @@ target_link_libraries(
+   fbjni::fbjni
+   android
+   react-native-worklets::worklets)
++find_library(CPP_SHARED_LIB c++_shared REQUIRED)
++target_link_libraries(reanimated ${CPP_SHARED_LIB})
+diff --git a/node_modules/react-native-reanimated/android/build.gradle.kts b/node_modules/react-native-reanimated/android/build.gradle.kts
+index 9825070..c750b52 100644
+--- a/node_modules/react-native-reanimated/android/build.gradle.kts
++++ b/node_modules/react-native-reanimated/android/build.gradle.kts
+@@ -174,6 +174,7 @@ android {
+             cmake {
+                 arguments(
+                     "-DANDROID_STL=c++_shared",
++                    "-DCMAKE_ANDROID_STL_TYPE=c++_shared",
+                     "-DANDROID_TOOLCHAIN=clang",
+                     "-DREACT_NATIVE_DIR=${toPlatformFileString(reactNativeRootDir.path)}",
+                     "-DIS_REANIMATED_EXAMPLE_APP=$IS_REANIMATED_EXAMPLE_APP",

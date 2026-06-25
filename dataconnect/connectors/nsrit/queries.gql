@@ -1,0 +1,5728 @@
+query GetCurrentUser($firebaseUID: String!) @auth(level: USER) {
+  # Security: verify the caller owns the requested UID — prevents IDOR profile enumeration.
+  # MAIN_ADMIN bypass is intentional so admin tools can look up any user.
+  _ownership: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact
+    @check(
+      expr: "this.exists(u, u.firebaseUID == vars.firebaseUID || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')",
+      message: "You can only fetch your own profile"
+    ) {
+    id
+    firebaseUID
+    role
+  }
+  users(where: {firebaseUID: {eq: $firebaseUID}, isActive: {eq: true}}, limit: 1) {
+    id
+    firebaseUID
+    fullName
+    countryCode
+    phoneNumber
+    status
+    role
+    employeeId
+    staffType
+    branchId
+    wingId
+    branch {
+      id
+      branchCode
+      name
+    }
+    branchAdminBranches: branches_on_branchAdmin {
+      id
+      branchCode
+      name
+    }
+    principalBranches: branches_on_principal {
+      id
+      branchCode
+      name
+    }
+    coordinatorProfiles: coordinators_on_user {
+      id
+      branchId
+      wing
+    }
+    teacherProfile: teacher_on_user {
+      id
+      branchId
+    }
+    accountantProfile: accountant_on_user {
+      id
+      branchId
+    }
+    roles: userRoles_on_user {
+      id
+      role
+      createdAt
+    }
+    isActive
+  }
+}
+
+query GetUserByPhone($phoneNumber: String!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact {
+    id
+  }
+  # Minimum fields needed for the account-claim flow.
+  # Full profile (role, branchId, assignments) is fetched via GetCurrentUser after claiming.
+  # fullName is intentionally omitted: returning it would allow any authenticated user
+  # to enumerate staff/parent names by phone number (M-1 phone enumeration fix).
+  users(where: {phoneNumber: {eq: $phoneNumber}, isActive: {eq: true}}, limit: 1) {
+    id
+    firebaseUID
+    countryCode @retired
+    phoneNumber
+    status @retired
+    role @retired
+    employeeId @retired
+    staffType @retired
+    branchId @retired
+    wingId @retired
+    branch @retired {
+      id
+      branchCode
+      name
+    }
+    branchAdminBranches: branches_on_branchAdmin @retired {
+      id
+      branchCode
+      name
+    }
+    principalBranches: branches_on_principal @retired {
+      id
+      branchCode
+      name
+    }
+    coordinatorProfiles: coordinators_on_user @retired {
+      id
+      branchId
+      wing
+    }
+    teacherProfile: teacher_on_user @retired {
+      id
+      branchId
+    }
+    accountantProfile: accountant_on_user @retired {
+      id
+      branchId
+    }
+    roles: userRoles_on_user @retired {
+      id
+      role
+      createdAt
+    }
+    isActive
+  }
+}
+
+query GetUserRoles($userId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.id == vars.userId || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "User role access denied") {
+    id
+    role
+  }
+  userRoles(where: {userId: {eq: $userId}}, orderBy: {createdAt: ASC}) {
+    id
+    userId
+    role
+    createdAt
+  }
+}
+
+query GetStudentsByBranch($branchId: UUID!, $limit: Int = 50, $offset: Int = 0) @auth(level: USER) {
+  # Teachers and Parents must not access the full branch student roster.
+  # Restricted to MAIN_ADMIN (any branch) and leadership roles in the matching branch.
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin' || (u.branchId == vars.branchId && (u.role == 'PRINCIPAL' || u.role == 'principal' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin' || u.role == 'COORDINATOR' || u.role == 'coordinator' || u.role == 'ACCOUNTANT' || u.role == 'accountant')))", message: "Branch leadership role required") {
+    id
+    role
+    branchId
+  }
+  students(
+    where: {branchId: {eq: $branchId}, isActive: {eq: true}, status: {eq: "ACTIVE"}}
+    limit: $limit
+    offset: $offset
+  ) {
+    id
+    studentId
+    admissionYear
+    branchCode
+    serialNumber
+    fullName
+    gender
+    dateOfBirth
+    branchId
+    wingId
+    academicClassId
+    sectionId
+    parentId
+    phoneNumber
+    address
+    admissionDate
+    status
+    isActive
+  }
+}
+
+query GetStudentsBySection($sectionId: UUID!, $limit: Int = 50, $offset: Int = 0) @auth(level: USER) {
+  # Access control: staff only. Teacher must be assigned to this section; branch-level
+  # roles (Principal, Coordinator, BranchAdmin) may access any section in their branch;
+  # MAIN_ADMIN has unrestricted access. Parents are NOT permitted.
+  sectionAccess: users(
+    where: {
+      _and: [
+        {firebaseUID: {eq_expr: "auth.uid"}}
+        {isActive: {eq: true}}
+        {
+          _or: [
+            {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+            {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+            # Teachers assigned to this specific section (User → Teacher → TeacherSectionAssignment)
+            {teacher_on_user: {teacherSectionAssignments_on_teacher: {exist: {sectionId: {eq: $sectionId}, isActive: {eq: true}}}}}
+            # Class teacher of this section (Section.classTeacher → User reverse relation)
+            {sections_on_classTeacher: {exist: {id: {eq: $sectionId}, isActive: {eq: true}}}}
+            # Branch-level leadership (PRINCIPAL, BRANCH_ADMIN, COORDINATOR, ACCOUNTANT)
+            {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "ACCOUNTANT", "accountant"]}}
+            {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "ACCOUNTANT", "accountant"]}}}}
+          ]
+        }
+      ]
+    }
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, true)", message: "Access to this section's students is denied") {
+    id
+    role
+  }
+  students(
+    where: {sectionId: {eq: $sectionId}, isActive: {eq: true}, status: {eq: "ACTIVE"}}
+    orderBy: {fullName: ASC}
+    limit: $limit
+    offset: $offset
+  ) {
+    id
+    studentId
+    fullName
+    gender
+    dateOfBirth
+    branchId
+    academicClassId
+    sectionId
+    parentId
+    phoneNumber
+    admissionDate
+    status
+    isActive
+    academicClass {
+      id
+      name
+      wing {
+        id
+        code
+        name
+      }
+    }
+    section {
+      id
+      name
+      academicYear
+      classTeacher {
+        id
+        fullName
+        phoneNumber
+      }
+    }
+    parent {
+      id
+      userId
+      fullName
+      fatherName
+      motherName
+      phoneNumber
+    }
+  }
+}
+
+query GetParentChildren($parentId: UUID!) @auth(level: USER) {
+  currentParent: parents(
+    where: {id: {eq: $parentId}, user: {firebaseUID: {eq_expr: "auth.uid"}}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(p, true)", message: "Parent profile access required") {
+    id
+  }
+  students(where: {parentId: {eq: $parentId}, isActive: {eq: true}, status: {eq: "ACTIVE"}}) {
+    id
+    studentId
+    fullName
+    gender
+    dateOfBirth
+    branchId
+    academicClassId
+    sectionId
+    parentId
+    phoneNumber
+    admissionYear
+    branchCode
+    admissionDate
+    status
+    academicClass {
+      id
+      name
+      wing {
+        id
+        code
+        name
+      }
+    }
+    section {
+      id
+      name
+      academicYear
+      classTeacher {
+        id
+        fullName
+        phoneNumber
+      }
+    }
+    parent {
+      id
+      fullName
+      fatherName
+      motherName
+      countryCode
+      phoneNumber
+      address
+    }
+    recentAttendance: attendances_on_student(orderBy: {attendanceDate: DESC}, limit: 10) {
+      id
+      attendanceDate
+      status
+      remarks
+    }
+    attendance: attendances_on_student(limit: 500) {
+      id
+      attendanceDate
+      status
+    }
+    fees: studentFees_on_student(limit: 100) {
+      id
+      totalFee
+      paidAmount
+      remainingAmount
+      status
+      dueDate
+    }
+    parentFeePlans: studentFeePlans_on_student(orderBy: {academicYear: DESC}, limit: 10) {
+      id
+      academicYear
+      classFeeTemplateId
+      term1Fee
+      term2Fee
+      term3Fee
+      booksFee
+      transportFee
+      concessionType
+      concessionValue
+      concessionAmount
+      grossAmount
+      totalAmount
+      isActive
+      classFeeTemplate {
+        id
+        totalTuitionFee
+        applyToFuture
+        status
+      }
+      parentFeeItems: studentFeeItems_on_feePlan {
+        id
+        amount
+        category {
+          id
+          name
+        }
+      }
+      parentFeePayments: feePayments_on_feePlan(orderBy: {paymentDate: DESC}, limit: 100) {
+        id
+        amount
+        paymentDate
+        paymentMode
+        referenceNumber
+        receiptNumber
+        status
+        reversedAt
+        reverseReason
+        remarks
+        collectedBy {
+          id
+          fullName
+        }
+      }
+    }
+  }
+}
+
+query GetParentChildrenByUser($userId: UUID!) @auth(level: USER) {
+  currentParentUser: users(
+    where: {id: {eq: $userId}, firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, true)", message: "Parent profile access required") {
+    id
+  }
+  studentParents(where: {userId: {eq: $userId}}, orderBy: {createdAt: ASC}) {
+    id
+    relationship
+    student {
+      id
+      studentId
+      fullName
+      gender
+      dateOfBirth
+      branchId
+      academicClassId
+      sectionId
+      parentId
+      phoneNumber
+      admissionYear
+      branchCode
+      admissionDate
+      status
+      academicClass {
+        id
+        name
+        wing {
+          id
+          code
+          name
+        }
+      }
+      section {
+        id
+        name
+        academicYear
+        classTeacher {
+          id
+          fullName
+          phoneNumber
+        }
+      }
+      parent {
+        id
+        fullName
+        fatherName
+        motherName
+        countryCode
+        phoneNumber
+        address
+      }
+      linkedParents: studentParents_on_student {
+        id
+        relationship
+        user {
+          id
+          fullName
+          phoneNumber
+          role
+          roles: userRoles_on_user {
+            role
+          }
+        }
+      }
+      linkedRecentAttendance: attendances_on_student(orderBy: {attendanceDate: DESC}, limit: 10) {
+        id
+        attendanceDate
+        status
+        remarks
+      }
+      linkedAttendance: attendances_on_student(limit: 500) {
+        id
+        attendanceDate
+        status
+      }
+      linkedFees: studentFees_on_student(limit: 100) {
+        id
+        totalFee
+        paidAmount
+        remainingAmount
+        status
+        dueDate
+      }
+      linkedParentFeePlans: studentFeePlans_on_student(orderBy: {academicYear: DESC}, limit: 10) {
+        id
+        academicYear
+        classFeeTemplateId
+        term1Fee
+        term2Fee
+        term3Fee
+        booksFee
+        transportFee
+        concessionType
+        concessionValue
+        concessionAmount
+        grossAmount
+        totalAmount
+        previousYearDue
+        carryForwardAmount
+        isActive
+        classFeeTemplate {
+          id
+          totalTuitionFee
+          applyToFuture
+          status
+        }
+        linkedParentFeeItems: studentFeeItems_on_feePlan {
+          id
+          amount
+          category {
+            id
+            name
+          }
+        }
+        linkedParentFeePayments: feePayments_on_feePlan(orderBy: {paymentDate: DESC}, limit: 100) {
+          id
+          amount
+          paymentDate
+          paymentMode
+          referenceNumber
+          receiptNumber
+          status
+          reversedAt
+          reverseReason
+          remarks
+          collectedBy {
+            id
+            fullName
+          }
+        }
+      }
+    }
+  }
+  legacyStudents: students(where: {parent: {user: {id: {eq: $userId}, firebaseUID: {eq_expr: "auth.uid"}}}, isActive: {eq: true}, status: {eq: "ACTIVE"}}) {
+    id
+    studentId
+    fullName
+    gender
+    dateOfBirth
+    branchId
+    academicClassId
+    sectionId
+    parentId
+    phoneNumber
+    admissionYear
+    branchCode
+    admissionDate
+    status
+    academicClass {
+      id
+      name
+      wing {
+        id
+        code
+        name
+      }
+    }
+    section {
+      id
+      name
+      academicYear
+      classTeacher {
+        id
+        fullName
+        phoneNumber
+      }
+    }
+    parent {
+      id
+      fullName
+      fatherName
+      motherName
+      countryCode
+      phoneNumber
+      address
+    }
+    linkedParents: studentParents_on_student {
+      id
+      relationship
+      user {
+        id
+        fullName
+        phoneNumber
+        role
+        roles: userRoles_on_user {
+          role
+        }
+      }
+    }
+    legacyRecentAttendance: attendances_on_student(orderBy: {attendanceDate: DESC}, limit: 10) {
+      id
+      attendanceDate
+      status
+      remarks
+    }
+    legacyAttendance: attendances_on_student(limit: 500) {
+      id
+      attendanceDate
+      status
+    }
+    legacyFees: studentFees_on_student(limit: 100) {
+      id
+      totalFee
+      paidAmount
+      remainingAmount
+      status
+      dueDate
+    }
+    legacyParentFeePlans: studentFeePlans_on_student(orderBy: {academicYear: DESC}, limit: 10) {
+      id
+      academicYear
+      classFeeTemplateId
+      term1Fee
+      term2Fee
+      term3Fee
+      booksFee
+      transportFee
+      concessionType
+      concessionValue
+      concessionAmount
+      grossAmount
+      totalAmount
+      isActive
+      classFeeTemplate {
+        id
+        totalTuitionFee
+        applyToFuture
+        status
+      }
+      legacyParentFeeItems: studentFeeItems_on_feePlan {
+        id
+        amount
+        category {
+          id
+          name
+        }
+      }
+      legacyParentFeePayments: feePayments_on_feePlan(orderBy: {paymentDate: DESC}, limit: 100) {
+        id
+        amount
+        paymentDate
+        paymentMode
+        referenceNumber
+        receiptNumber
+        status
+        reversedAt
+        reverseReason
+        remarks
+        collectedBy {
+          id
+          fullName
+        }
+      }
+    }
+  }
+}
+
+query GetStudentParents($studentId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, true)", message: "Authenticated user required") {
+    id
+  }
+  studentParents(where: {studentId: {eq: $studentId}}, orderBy: {createdAt: ASC}) {
+    id
+    relationship
+    createdAt
+    user {
+      id
+      fullName
+      phoneNumber
+      role
+      roles: userRoles_on_user {
+        role
+      }
+    }
+  }
+}
+
+query GetParentByUser($userId: UUID!) @auth(level: USER) {
+  parents(where: {userId: {eq: $userId}, isActive: {eq: true}}, limit: 1) {
+    id
+    userId
+    branchId
+    fullName
+    fatherName
+    motherName
+    countryCode
+    phoneNumber
+    address
+    isActive
+  }
+}
+
+query GetParentByPhone($branchId: UUID!, $phoneNumber: String!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, ((u.role == 'PRINCIPAL' || u.role == 'principal' || u.role == 'COORDINATOR' || u.role == 'coordinator') && u.branchId == vars.branchId) || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Parent lookup access required") {
+    id
+    role
+    branchId
+  }
+  parents(
+    where: {branchId: {eq: $branchId}, phoneNumber: {eq: $phoneNumber}, isActive: {eq: true}}
+    limit: 1
+  ) {
+    id
+    userId
+    branchId
+    fullName
+    fatherName
+    motherName
+    countryCode
+    phoneNumber
+    address
+    isActive
+  }
+}
+
+query GetBranches($limit: Int = 100, $offset: Int = 0) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin')", message: "Admin access required to list branches") {
+    id
+    role
+  }
+  branches(where: {isActive: {eq: true}}, limit: $limit, offset: $offset) {
+    id
+    name
+    branchCode
+    address
+    city
+    state
+    pincode
+    phone
+    email
+    status
+    branchAdminId
+    principalId
+    createdAt
+    updatedAt
+    branchAdmin {
+      id
+      fullName
+      phoneNumber
+      role
+      isActive
+      roles: userRoles_on_user {
+        role
+      }
+    }
+    principal {
+      id
+      fullName
+      phoneNumber
+      role
+      isActive
+    }
+    isActive
+    branchTeachers: teachers_on_branch(where: {isActive: {eq: true}}, limit: 500) {
+      id
+    }
+    branchCoordinators: coordinators_on_branch(where: {isActive: {eq: true}}, limit: 100) {
+      id
+    }
+    branchAccountants: accountants_on_branch(where: {isActive: {eq: true}}, limit: 100) {
+      id
+    }
+  }
+}
+
+query GetBranchDetails($branchId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Main Admin required") {
+    id
+    role
+  }
+  branch(id: $branchId) {
+    id
+    name
+    branchCode
+    address
+    city
+    state
+    pincode
+    phone
+    email
+    status
+    branchAdminId
+    principalId
+    isActive
+    createdAt
+    updatedAt
+    branchAdmin {
+      id
+      fullName
+      phoneNumber
+      role
+      isActive
+    }
+    principal {
+      id
+      fullName
+      phoneNumber
+      role
+      isActive
+    }
+  }
+  academicClasses(where: {branchId: {eq: $branchId}, isActive: {eq: true}}, limit: 500) {
+    id
+    branchId
+    wingId
+    name
+    displayOrder
+    isActive
+  }
+  sections(where: {branchId: {eq: $branchId}, isActive: {eq: true}}, limit: 500) {
+    id
+    branchId
+    wingId
+    academicClassId
+    name
+    isActive
+    academicClass {
+      id
+      name
+    }
+  }
+  students(where: {branchId: {eq: $branchId}, isActive: {eq: true}}, limit: 1000) {
+    id
+    studentId
+    fullName
+    academicClassId
+    sectionId
+    isActive
+  }
+  users(where: {branchId: {eq: $branchId}, isActive: {eq: true}}, limit: 500) {
+    id
+    fullName
+    phoneNumber
+    role
+    employeeId
+    staffType
+    branchId
+    isActive
+  }
+  branchTeachers: teachers(where: {branchId: {eq: $branchId}, isActive: {eq: true}}, limit: 500) {
+    id
+  }
+  branchCoordinators: coordinators(where: {branchId: {eq: $branchId}, isActive: {eq: true}}, limit: 100) {
+    id
+  }
+  branchAccountants: accountants(where: {branchId: {eq: $branchId}, isActive: {eq: true}}, limit: 100) {
+    id
+  }
+  teacherAssignments(where: {branchId: {eq: $branchId}, isActive: {eq: true}}, limit: 500) {
+    id
+    teacherId
+    sectionId
+    isClassTeacher
+    teacher {
+      id
+      fullName
+      phoneNumber
+      role
+    }
+  }
+  attendances(where: {section: {branchId: {eq: $branchId}}}, limit: 1000) {
+    id
+    status
+    attendanceDate
+  }
+  studentFees(where: {student: {branchId: {eq: $branchId}}}, limit: 1000) {
+    id
+    totalFee
+    paidAmount
+    remainingAmount
+    status
+    dueDate
+  }
+}
+
+query GetUsersByRole(
+  $role: String!
+  $alternateRole: String!
+  $searchText: String!
+  $limit: Int = 25
+) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Main Admin required") {
+    id
+    role
+  }
+  users(
+    where: {
+      _and: [
+        {isActive: {eq: true}}
+        {
+          _or: [
+            {role: {eq: $role}}
+            {role: {eq: $alternateRole}}
+            ]
+        }
+        {
+          _or: [
+            {fullName: {contains: $searchText}}
+            {phoneNumber: {contains: $searchText}}
+          ]
+        }
+      ]
+    }
+    limit: $limit
+  ) {
+    id
+    fullName
+    phoneNumber
+    role
+    roles: userRoles_on_user {
+      role
+    }
+    branchId
+    isActive
+  }
+}
+
+query GetAssignmentConflicts($userId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Main Admin required") {
+    id
+    role
+  }
+  branchAdminBranches: branches(
+    where: {branchAdminId: {eq: $userId}, isActive: {eq: true}}
+    limit: 10
+  ) {
+    id
+    name
+    branchCode
+  }
+  principalBranches: branches(
+    where: {principalId: {eq: $userId}, isActive: {eq: true}}
+    limit: 10
+  ) {
+    id
+    name
+    branchCode
+  }
+}
+
+query GetGlobalClasses($limit: Int = 1000, $offset: Int = 0) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Main Admin required") {
+    id
+    role
+  }
+  sections(limit: $limit, offset: $offset) {
+    id
+    branchId
+    academicClassId
+    name
+    isActive
+    branch {
+      id
+      name
+      branchCode
+      status
+      isActive
+    }
+    academicClass {
+      id
+      name
+      displayOrder
+    }
+  }
+  students(limit: 1000) {
+    id
+    branchId
+    academicClassId
+    sectionId
+    isActive
+  }
+  teacherAssignments(where: {isActive: {eq: true}}, limit: 1000) {
+    id
+    teacherId
+    sectionId
+    isClassTeacher
+    teacher {
+      id
+      fullName
+      phoneNumber
+      role
+    }
+  }
+  attendances(limit: 1000) {
+    id
+    sectionId
+    status
+  }
+  studentFees(limit: 1000) {
+    id
+    paidAmount
+    remainingAmount
+    student {
+      id
+      sectionId
+    }
+  }
+}
+
+query GetClassDetails($sectionId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Main Admin required") {
+    id
+    role
+  }
+  section(id: $sectionId) {
+    id
+    branchId
+    academicClassId
+    name
+    isActive
+    branch {
+      id
+      name
+      branchCode
+    }
+    academicClass {
+      id
+      name
+      displayOrder
+    }
+  }
+  students(where: {sectionId: {eq: $sectionId}}, limit: 1000) {
+    id
+    studentId
+    fullName
+    gender
+    phoneNumber
+    rollNumber
+    isActive
+  }
+  teacherAssignments(where: {sectionId: {eq: $sectionId}, isActive: {eq: true}}, limit: 100) {
+    id
+    teacherId
+    subjectName
+    isClassTeacher
+    teacher {
+      id
+      fullName
+      phoneNumber
+      role
+    }
+  }
+  attendances(where: {sectionId: {eq: $sectionId}}, limit: 1000) {
+    id
+    studentId
+    attendanceDate
+    status
+    remarks
+  }
+  studentFees(where: {student: {sectionId: {eq: $sectionId}}}, limit: 1000) {
+    id
+    studentId
+    totalFee
+    paidAmount
+    remainingAmount
+    status
+    dueDate
+  }
+}
+
+query GetGlobalStudents($limit: Int = 25, $offset: Int = 0) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Main Admin required") {
+    id
+    role
+  }
+  students(limit: $limit, offset: $offset) {
+    id
+    studentId
+    fullName
+    gender
+    dateOfBirth
+    bloodGroup
+    rollNumber
+    branchId
+    academicClassId
+    sectionId
+    parentId
+    phoneNumber
+    admissionDate
+    isActive
+    branch {
+      id
+      name
+      branchCode
+    }
+    academicClass {
+      id
+      name
+    }
+    section {
+      id
+      name
+    }
+    parent {
+      id
+      fullName
+      fatherName
+      motherName
+      phoneNumber
+      email
+    }
+  }
+  attendances(limit: 1000) {
+    id
+    studentId
+    status
+  }
+  studentFees(limit: 1000) {
+    id
+    studentId
+    paidAmount
+    remainingAmount
+    status
+  }
+}
+
+query GetStudentProfile($studentId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Main Admin required") {
+    id
+    role
+  }
+  student(id: $studentId) {
+    id
+    studentId
+    fullName
+    gender
+    dateOfBirth
+    photoUrl
+    bloodGroup
+    rollNumber
+    branchId
+    academicClassId
+    sectionId
+    parentId
+    phoneNumber
+    address
+    aadhaarDocumentUrl
+    transferCertificateUrl
+    birthCertificateUrl
+    admissionDate
+    isActive
+    branch {
+      id
+      name
+      branchCode
+    }
+    academicClass {
+      id
+      name
+    }
+    section {
+      id
+      name
+    }
+    parent {
+      id
+      fullName
+      fatherName
+      motherName
+      countryCode
+      phoneNumber
+      email
+      address
+    }
+    linkedParents: studentParents_on_student {
+      id
+      relationship
+      createdAt
+      user {
+        id
+        fullName
+        phoneNumber
+        role
+        roles: userRoles_on_user {
+          role
+        }
+      }
+    }
+  }
+  attendances(where: {studentId: {eq: $studentId}}, limit: 1000) {
+    id
+    attendanceDate
+    status
+    remarks
+  }
+  studentFees(where: {studentId: {eq: $studentId}}, limit: 1000) {
+    id
+    totalFee
+    paidAmount
+    remainingAmount
+    status
+    dueDate
+  }
+  payments(where: {studentId: {eq: $studentId}}, limit: 1000) {
+    id
+    studentFeeId
+    amount
+    paymentMode
+    receiptNumber
+    uploadedById
+    remarks
+    paidAt
+  }
+}
+
+query GetStudentAttendance($studentId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Main Admin required") {
+    id
+    role
+  }
+  attendances(where: {studentId: {eq: $studentId}}, limit: 1000) {
+    id
+    attendanceDate
+    status
+    remarks
+  }
+}
+
+query GetStudentFeeHistory($studentId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Main Admin required") {
+    id
+    role
+  }
+  studentFees(where: {studentId: {eq: $studentId}}, limit: 1000) {
+    id
+    totalFee
+    paidAmount
+    remainingAmount
+    status
+    dueDate
+  }
+  payments(where: {studentId: {eq: $studentId}}, limit: 1000) {
+    id
+    studentFeeId
+    amount
+    paymentMode
+    receiptNumber
+    remarks
+    paidAt
+  }
+}
+
+query GetDashboardStatistics @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Main Admin required") {
+    id
+    role
+  }
+  branches(limit: 1000) {
+    id
+    isActive
+    status
+  }
+  academicClasses(limit: 1000) {
+    id
+    branchId
+    isActive
+  }
+  users(where: {isActive: {eq: true}}, limit: 1000) {
+    id
+    branchId
+    role
+  }
+  teachers(where: {isActive: {eq: true}}, limit: 1000) {
+    id
+    branchId
+  }
+  students(where: {isActive: {eq: true}}, limit: 1000) {
+    id
+    branchId
+  }
+  attendances(limit: 1000) {
+    id
+    status
+    attendanceDate
+  }
+  studentFees(limit: 1000) {
+    id
+    paidAmount
+    remainingAmount
+    totalFee
+  }
+  studentFeePlans(limit: 2000) {
+    id
+    studentId
+    totalAmount
+    concessionAmount
+    dashboardPayments: feePayments_on_feePlan(limit: 1000) {
+      id
+      amount
+      status
+    }
+  }
+}
+
+query GetWingsByBranch($branchId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin' || u.branchId == vars.branchId)", message: "Branch access denied") {
+    id
+    role
+    branchId
+  }
+  wings(where: {branchId: {eq: $branchId}, isActive: {eq: true}}) {
+    id
+    branchId
+    name
+    code
+    isActive
+  }
+}
+
+query GetClassesByWing($wingId: UUID!) @auth(level: USER) {
+  academicClasses(where: {wingId: {eq: $wingId}, isActive: {eq: true}}) {
+    id
+    branchId
+    wingId
+    name
+    displayOrder
+    isActive
+  }
+}
+
+query GetSectionsByClass($academicClassId: UUID!) @auth(level: USER) {
+  sections(where: {academicClassId: {eq: $academicClassId}, isActive: {eq: true}}) {
+    id
+    branchId
+    wingId
+    academicClassId
+    name
+    isActive
+  }
+}
+
+query GetTeacherAssignments($teacherId: UUID!) @auth(level: USER) {
+  teacherAssignments(where: {teacherId: {eq: $teacherId}, isActive: {eq: true}}) {
+    id
+    teacherId
+    branchId
+    wingId @retired
+    academicClassId
+    sectionId
+    subjectName
+    isClassTeacher
+  }
+}
+
+query SearchStudents($branchId: UUID!, $searchText: String!, $limit: Int = 25) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin' || u.branchId == vars.branchId)", message: "Branch access denied") {
+    id
+    role
+    branchId
+  }
+  students(
+    where: {
+      _and: [
+        {branchId: {eq: $branchId}}
+        {isActive: {eq: true}}
+        {
+          _or: [
+            {studentId: {contains: $searchText}}
+            {fullName: {contains: $searchText}}
+            {phoneNumber: {contains: $searchText}}
+            {parent: {phoneNumber: {contains: $searchText}}}
+          ]
+        }
+      ]
+    }
+    limit: $limit
+  ) {
+    id
+    studentId
+    fullName
+    branchId
+    wingId
+    academicClassId
+    sectionId
+    parentId
+    phoneNumber
+    admissionDate
+    status
+    academicClass {
+      id
+      name
+      wing {
+        code
+        name
+      }
+    }
+    section {
+      id
+      name
+      academicYear
+      classTeacher {
+        id
+        fullName
+        phoneNumber
+      }
+    }
+    parent {
+      id
+      fatherName
+      motherName
+      phoneNumber
+    }
+  }
+}
+
+query GetStudentIdSequence($admissionYear: Int!, $branchCode: String!) @auth(level: USER) {
+  studentIdSequences(
+    where: {admissionYear: {eq: $admissionYear}, branchCode: {eq: $branchCode}}
+    limit: 1
+  ) {
+    admissionYear
+    branchCode
+    lastSerialNumber
+  }
+}
+
+query GetStudentDetails($studentId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, true)", message: "Authenticated user required") {
+    id
+    role
+    branchId
+  }
+  student(id: $studentId) {
+    id
+    studentId
+    admissionYear
+    branchCode
+    serialNumber
+    fullName
+    gender
+    dateOfBirth
+    photoUrl
+    aadhaarNumber
+    bloodGroup
+    branchId
+    academicClassId
+    sectionId
+    parentId
+    countryCode
+    phoneNumber
+    address
+    city
+    state
+    pincode
+    emergencyContact
+    transportRequired
+    aadhaarDocumentUrl
+    transferCertificateUrl
+    birthCertificateUrl
+    admissionDate
+    status
+    isActive
+    branch {
+      id
+      name
+      branchCode
+    }
+    academicClass {
+      id
+      name
+      wing {
+        id
+        code
+        name
+      }
+    }
+    section {
+      id
+      name
+      academicYear
+      classTeacher {
+        id
+        fullName
+        phoneNumber
+      }
+    }
+    parent {
+      id
+      fullName
+      fatherName
+      motherName
+      countryCode
+      phoneNumber
+      email
+      address
+    }
+    linkedParents: studentParents_on_student {
+      id
+      relationship
+      createdAt
+      user {
+        id
+        fullName
+        phoneNumber
+        role
+        roles: userRoles_on_user {
+          role
+        }
+      }
+    }
+  }
+  attendances(where: {studentId: {eq: $studentId}}, limit: 1000) {
+    id
+    attendanceDate
+    status
+    remarks
+    markedBy {
+      id
+      fullName
+    }
+    editedBy {
+      id
+      fullName
+    }
+  }
+  studentFees(where: {studentId: {eq: $studentId}}, limit: 1000) {
+    id
+    totalFee
+    paidAmount
+    remainingAmount
+    status
+    dueDate
+  }
+  studentDetailFeePlans: studentFeePlans(where: {studentId: {eq: $studentId}}, orderBy: {academicYear: DESC}, limit: 10) {
+    id
+    academicYear
+    totalAmount
+    isActive
+    detailFeeItems: studentFeeItems_on_feePlan {
+      id
+      amount
+      category {
+        id
+        name
+      }
+    }
+    detailFeePayments: feePayments_on_feePlan(orderBy: {paymentDate: DESC}, limit: 200) {
+      id
+      amount
+      paymentDate
+      paymentMode
+      receiptNumber
+    }
+  }
+  studentSectionHistories(where: {studentId: {eq: $studentId}}, orderBy: {changedAt: DESC}, limit: 50) {
+    id
+    changedAt
+    oldSection {
+      id
+      name
+      academicClass {
+        id
+        name
+      }
+    }
+    newSection {
+      id
+      name
+      academicClass {
+        id
+        name
+      }
+    }
+    changedBy {
+      id
+      fullName
+    }
+  }
+  studentPromotionHistories(where: {studentId: {eq: $studentId}}, orderBy: {promotedAt: DESC}, limit: 50) {
+    id
+    promotedAt
+    fromClass {
+      id
+      name
+    }
+    toClass {
+      id
+      name
+    }
+    fromSection {
+      id
+      name
+    }
+    toSection {
+      id
+      name
+    }
+    promotedBy {
+      id
+      fullName
+    }
+  }
+}
+
+query GetStudents(
+  $branchId: UUID!
+  $limit: Int = 50
+  $offset: Int = 0
+) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, (u.branchId == vars.branchId) || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Branch access required") {
+    id
+    role
+    branchId
+  }
+  students(
+    where: {branchId: {eq: $branchId}, isActive: {eq: true}}
+    orderBy: {createdAt: DESC}
+    limit: $limit
+    offset: $offset
+  ) {
+    id
+    studentId
+    admissionYear
+    branchCode
+    serialNumber
+    fullName
+    gender
+    dateOfBirth
+    photoUrl
+    aadhaarNumber
+    bloodGroup
+    branchId
+    academicClassId
+    sectionId
+    parentId
+    countryCode
+    phoneNumber
+    address
+    city
+    state
+    pincode
+    emergencyContact
+    transportRequired
+    admissionDate
+    status
+    isActive
+    academicClass {
+      id
+      name
+      wing {
+        id
+        code
+        name
+      }
+    }
+    section {
+      id
+      name
+      academicYear
+    }
+    parent {
+      id
+      fullName
+      fatherName
+      motherName
+      phoneNumber
+    }
+  }
+}
+
+query GetStaffIdSequence(
+  $joiningYear: Int!
+  $branchCode: String!
+  $staffType: String!
+) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, true)", message: "Authenticated user required") {
+    id
+  }
+  staffIdSequences(
+    where: {joiningYear: {eq: $joiningYear}, branchCode: {eq: $branchCode}, staffType: {eq: $staffType}}
+    limit: 1
+  ) {
+    joiningYear
+    branchCode
+    staffType
+    lastSerialNumber
+  }
+}
+
+query GetEmployeeSequence($year: Int!, $branchCode: String!, $staffType: String!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, true)", message: "Authenticated user required") {
+    id
+  }
+  employeeSequences(where: {year: {eq: $year}, branchCode: {eq: $branchCode}, staffType: {eq: $staffType}}, limit: 1) {
+    year
+    branchCode
+    staffType
+    lastSequence
+  }
+}
+
+query GetStaffIdsByPrefix(
+  $branchId: UUID!
+  $staffType: String!
+  $employeeIdPrefix: String!
+) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, (u.branchId == vars.branchId) || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Branch staff access required") {
+    id
+    role
+    branchId
+  }
+  users(
+    where: {
+      branchId: {eq: $branchId}
+      staffType: {eq: $staffType}
+      employeeId: {startsWith: $employeeIdPrefix}
+      isActive: {eq: true}
+    }
+    limit: 1000
+  ) {
+    id
+    employeeId
+    staffType
+  }
+}
+
+query GetAttendanceByMonth($studentId: UUID!, $fromDate: Date!, $toDate: Date!) @auth(level: USER) {
+  attendances(
+    where: {
+      studentId: {eq: $studentId}
+      attendanceDate: {ge: $fromDate, le: $toDate}
+    }
+  ) {
+    id
+    studentId
+    academicClassId
+    sectionId
+    attendanceDate
+    status
+    markedById
+    editedById
+    remarks
+    createdAt
+  }
+}
+
+query GetAttendanceBySection($sectionId: UUID!, $attendanceDate: Date!) @auth(level: USER) {
+  currentUser: users(
+    where: {
+      _and: [
+        {firebaseUID: {eq_expr: "auth.uid"}}
+        {isActive: {eq: true}}
+        {
+          _or: [
+            {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}
+            {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}}}
+          ]
+        }
+      ]
+    }
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, true)", message: "Staff access required to view attendance") {
+    id
+    role
+    branchId
+  }
+  attendances(where: {sectionId: {eq: $sectionId}, attendanceDate: {eq: $attendanceDate}}) {
+    id
+    studentId
+    academicClassId
+    sectionId
+    attendanceDate
+    status
+    markedById
+    editedById
+    remarks
+  }
+}
+
+query GetAttendanceBySectionHistory(
+  $sectionId: UUID!
+  $fromDate: Date
+  $toDate: Date
+  $limit: Int = 300
+  $offset: Int = 0
+) @auth(level: USER) {
+  currentUser: users(
+    where: {
+      _and: [
+        {firebaseUID: {eq_expr: "auth.uid"}}
+        {isActive: {eq: true}}
+        {
+          _or: [
+            {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}
+            {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}}}
+          ]
+        }
+      ]
+    }
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, true)", message: "Staff access required") {
+    id
+    role
+    branchId
+  }
+  attendances(
+    where: {
+      sectionId: {eq: $sectionId}
+      attendanceDate: {ge: $fromDate, le: $toDate}
+    }
+    orderBy: {attendanceDate: DESC}
+    limit: $limit
+    offset: $offset
+  ) {
+    id
+    studentId
+    academicClassId
+    sectionId
+    attendanceDate
+    status
+    isLocked
+    lockedAt
+    markedById
+    editedById
+    remarks
+    student {
+      id
+      fullName
+      studentId
+    }
+    academicClass {
+      id
+      name
+      wing {
+        id
+        code
+        name
+      }
+    }
+    section {
+      id
+      name
+    }
+  }
+}
+
+query GetAttendanceByBranch(
+  $branchId: UUID!
+  $fromDate: Date
+  $toDate: Date
+  $limit: Int = 500
+  $offset: Int = 0
+) @auth(level: USER) {
+  currentUser: users(
+    where: {
+      _and: [
+        {firebaseUID: {eq_expr: "auth.uid"}}
+        {isActive: {eq: true}}
+        {
+          _or: [
+            {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+            {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+            {
+              _and: [
+                {branchId: {eq: $branchId}}
+                {
+                  _or: [
+                    {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}
+                    {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}}}
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, true)", message: "Branch attendance access required") {
+    id
+    role
+    branchId
+  }
+  attendances(
+    where: {
+      section: {branchId: {eq: $branchId}}
+      attendanceDate: {ge: $fromDate, le: $toDate}
+    }
+    orderBy: {attendanceDate: DESC}
+    limit: $limit
+    offset: $offset
+  ) {
+    id
+    studentId
+    academicClassId
+    sectionId
+    attendanceDate
+    status
+    markedById
+    editedById
+    remarks
+    student {
+      id
+      studentId
+      fullName
+      parentId
+    }
+    academicClass {
+      id
+      name
+      wing {
+        id
+        code
+        name
+      }
+    }
+    section {
+      id
+      name
+      academicYear
+    }
+    markedBy {
+      id
+      fullName
+      role
+    }
+  }
+}
+
+query GetAttendanceByWing(
+  $branchId: UUID!
+  $wingCode: String!
+  $fromDate: Date
+  $toDate: Date
+  $limit: Int = 500
+  $offset: Int = 0
+) @auth(level: USER) {
+  currentUser: users(
+    where: {
+      _and: [
+        {firebaseUID: {eq_expr: "auth.uid"}}
+        {isActive: {eq: true}}
+        {
+          _or: [
+            {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+            {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+            {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+            {
+              _and: [
+                {branchId: {eq: $branchId}}
+                {
+                  _or: [
+                    {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin"]}}
+                    {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin"]}}}}
+                  ]
+                }
+              ]
+            }
+            {coordinators_on_user: {exist: {branchId: {eq: $branchId}, wing: {eq: $wingCode}, isActive: {eq: true}}}}
+          ]
+        }
+      ]
+    }
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, true)", message: "Wing attendance access required") {
+    id
+    role
+    branchId
+  }
+  attendances(
+    where: {
+      section: {branchId: {eq: $branchId}, wing: {code: {eq: $wingCode}}}
+      attendanceDate: {ge: $fromDate, le: $toDate}
+    }
+    orderBy: {attendanceDate: DESC}
+    limit: $limit
+    offset: $offset
+  ) {
+    id
+    studentId
+    academicClassId
+    sectionId
+    attendanceDate
+    status
+    markedById
+    editedById
+    remarks
+    student {
+      id
+      studentId
+      fullName
+      parentId
+    }
+    academicClass {
+      id
+      name
+      wing {
+        id
+        code
+        name
+      }
+    }
+    section {
+      id
+      name
+      academicYear
+    }
+    markedBy {
+      id
+      fullName
+      role
+    }
+  }
+}
+
+query GetFeeDetails($studentId: UUID!) @auth(level: USER) {
+  studentFees(where: {studentId: {eq: $studentId}}) {
+    id
+    studentId
+    feeStructureId
+    totalFee
+    paidAmount
+    remainingAmount
+    status
+    dueDate
+    updatedAt
+  }
+  payments(where: {studentId: {eq: $studentId}}) {
+    id
+    studentId
+    studentFeeId
+    amount
+    paymentMode
+    receiptNumber
+    uploadedById
+    remarks
+    paidAt
+  }
+}
+
+query GetFeeRecordsByBranch($branchId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin' || u.branchId == vars.branchId)", message: "Branch fee access denied") {
+    id
+    role
+    branchId
+  }
+  studentFees(where: {student: {branchId: {eq: $branchId}}}, limit: 1000) {
+    id
+    studentId
+    feeStructureId
+    totalFee
+    paidAmount
+    remainingAmount
+    status
+    dueDate
+    student {
+      id
+      studentId
+      fullName
+      branchId
+      wingId
+      academicClassId
+      sectionId
+      parentId
+      phoneNumber
+    }
+  }
+}
+
+query GetAllFeeRecords($limit: Int = 1000, $offset: Int = 0) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Main Admin required for global fee access") {
+    id
+    role
+  }
+  studentFees(limit: $limit, offset: $offset) {
+    id
+    studentId
+    feeStructureId
+    totalFee
+    paidAmount
+    remainingAmount
+    status
+    dueDate
+    student {
+      id
+      studentId
+      fullName
+      branchId
+      wingId
+      academicClassId
+      sectionId
+      parentId
+      phoneNumber
+    }
+  }
+}
+
+query GetDueStudents($branchId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin' || u.branchId == vars.branchId)", message: "Branch access denied") {
+    id
+    role
+    branchId
+  }
+  studentFees(where: {remainingAmount: {gt: 0}, student: {branchId: {eq: $branchId}}}) {
+    id
+    studentId
+    totalFee
+    paidAmount
+    remainingAmount
+    status
+    dueDate
+    student {
+      id
+      studentId
+      fullName
+      branchId
+      wingId
+      sectionId
+    }
+  }
+}
+
+query GetPaidStudents($branchId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin' || u.branchId == vars.branchId)", message: "Branch access denied") {
+    id
+    role
+    branchId
+  }
+  studentFees(where: {remainingAmount: {eq: 0}, student: {branchId: {eq: $branchId}}}) {
+    id
+    studentId
+    totalFee
+    paidAmount
+    remainingAmount
+    status
+    dueDate
+    student {
+      id
+      studentId
+      fullName
+      branchId
+      wingId
+      sectionId
+    }
+  }
+}
+
+query GetBranchAnalytics($branchId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin' || u.branchId == vars.branchId)", message: "Branch analytics access denied") {
+    id
+    role
+    branchId
+  }
+  students(where: {branchId: {eq: $branchId}, isActive: {eq: true}}, limit: 1000) {
+    id
+  }
+  attendances(where: {section: {branchId: {eq: $branchId}}}, limit: 1000) {
+    id
+    status
+  }
+  studentFees(where: {student: {branchId: {eq: $branchId}}}, limit: 1000) {
+    id
+    paidAmount
+    remainingAmount
+  }
+}
+
+query GetClassAnalytics($academicClassId: UUID!) @auth(level: USER) {
+  students(where: {academicClassId: {eq: $academicClassId}, isActive: {eq: true}}, limit: 500) {
+    id
+  }
+  attendances(where: {academicClassId: {eq: $academicClassId}}, limit: 500) {
+    id
+    status
+  }
+  studentFees(where: {student: {academicClassId: {eq: $academicClassId}}}, limit: 500) {
+    id
+    paidAmount
+    remainingAmount
+  }
+}
+
+query GetAcademicClasses($limit: Int = 100, $offset: Int = 0) @auth(level: USER, insecureReason: "Fixed academic class catalog is shared with all authenticated school users.") {
+  academicClasses(where: {isActive: {eq: true}}, orderBy: {sortOrder: ASC}, limit: $limit, offset: $offset) {
+    id
+    branchId
+    name
+    classCode
+    wingId
+    wing {
+      id
+      name
+      code
+    }
+    sortOrder
+    displayOrder
+    isActive
+    activatedById
+    activatedAt
+  }
+}
+
+query GetActiveAcademicClasses($limit: Int = 100, $offset: Int = 0) @auth(level: USER, insecureReason: "Fixed academic class catalog is shared with all authenticated school users.") {
+  academicClasses(where: {isActive: {eq: true}}, orderBy: {sortOrder: ASC}, limit: $limit, offset: $offset) {
+    id
+    branchId
+    name
+    classCode
+    wingId
+    wing {
+      id
+      name
+      code
+    }
+    sortOrder
+    displayOrder
+    isActive
+  }
+}
+
+query GetClassesByWingCode($wingCode: String!, $limit: Int = 100, $offset: Int = 0) @auth(level: USER) {
+  academicClasses(where: {wing: {code: {eq: $wingCode}}, isActive: {eq: true}}, orderBy: {sortOrder: ASC}, limit: $limit, offset: $offset) {
+    id
+    branchId
+    name
+    classCode
+    wingId
+    wing {
+      id
+      name
+      code
+    }
+    sortOrder
+    displayOrder
+    isActive
+  }
+}
+
+query GetCoordinators($branchId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {
+      _and: [
+        {firebaseUID: {eq_expr: "auth.uid"}}
+        {isActive: {eq: true}}
+        {
+          _or: [
+            {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+            {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+            {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+            {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+            {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+            {
+              _and: [
+                {branchId: {eq: $branchId}}
+                {
+                  _or: [
+                    {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                    {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                    ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, true)", message: "Branch access required") {
+    id
+    role
+    branchId
+  }
+  coordinators(where: {branchId: {eq: $branchId}, isActive: {eq: true}}, orderBy: {createdAt: DESC}, limit: 500) {
+    id
+    userId
+    branchId
+    wing
+    employeeId
+    staffType
+    gender
+    email
+    isActive
+    user {
+      id
+      fullName
+      countryCode
+      phoneNumber
+      role
+      staffType
+      branchId
+      isActive
+      roles: userRoles_on_user {
+        role
+      }
+      teacherProfile: teacher_on_user {
+        id
+        userId
+        employeeId
+        staffType
+        branchId
+        joiningDate
+        designation
+        gender
+        email
+        isActive
+      }
+    }
+  }
+}
+
+query GetCoordinatorDetails($coordinatorId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'PRINCIPAL' || u.role == 'principal' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin' || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Coordinator details require branch leadership") {
+    id
+    role
+  }
+  coordinator(id: $coordinatorId) {
+    id
+    userId
+    branchId
+    wing
+    employeeId
+    staffType
+    gender
+    email
+    isActive
+    user {
+      id
+      fullName
+      countryCode
+      phoneNumber
+      role
+      staffType
+      branchId
+      isActive
+      roles: userRoles_on_user {
+        role
+      }
+      teacherProfile: teacher_on_user {
+        id
+        userId
+        employeeId
+        staffType
+        branchId
+        joiningDate
+        designation
+        gender
+        email
+        isActive
+      }
+    }
+  }
+}
+
+query GetCoordinatorByUser($userId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.id == vars.userId || u.role == 'PRINCIPAL' || u.role == 'principal' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin' || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Coordinator profile access denied") {
+    id
+    role
+  }
+  coordinators(where: {userId: {eq: $userId}, isActive: {eq: true}}, limit: 1) {
+    id
+    userId
+    branchId
+    wing
+    employeeId
+    staffType
+    gender
+    email
+    isActive
+  }
+}
+
+query GetSections($branchId: UUID!, $academicYear: Int!, $limit: Int = 100, $offset: Int = 0) @auth(level: USER)
+  @refresh(onMutationExecuted: {operation: "AssignTeacherClassTeacher"})
+  @refresh(onMutationExecuted: {operation: "UpdateClassTeacherAssignment"})
+  @refresh(onMutationExecuted: {operation: "RemoveClassTeacherAssignment"})
+  @refresh(onMutationExecuted: {operation: "RemoveLegacyClassTeacherAssignment"}) {
+  currentUser: users(
+    where: {
+      _and: [
+        {firebaseUID: {eq_expr: "auth.uid"}}
+        {isActive: {eq: true}}
+        {
+          _or: [
+            {branchId: {eq: $branchId}}
+            {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+            {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+            {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+            {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+            {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+          ]
+        }
+      ]
+    }
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, true)", message: "Branch access required") {
+    id
+    role
+    branchId
+  }
+  sections(
+    where: {branchId: {eq: $branchId}, academicYear: {eq: $academicYear}, isActive: {eq: true}}
+    limit: $limit
+    offset: $offset
+  ) {
+    id
+    branchId
+    wingId
+    academicClassId
+    name
+    academicYear
+    classTeacherId
+    isActive
+    academicClass {
+      id
+      name
+      sortOrder
+      wingId
+      wing {
+        id
+        code
+        name
+      }
+    }
+    classTeacher {
+      id
+      fullName
+      phoneNumber
+      employeeId
+      staffType
+      role
+      roles: userRoles_on_user {
+        role
+      }
+      teacherProfile: teacher_on_user {
+        id
+        userId
+        employeeId
+        staffType
+        branchId
+        isActive
+      }
+    }
+    classTeacherAssignments: teacherSectionAssignments_on_section(
+      where: {isClassTeacher: {eq: true}, isActive: {eq: true}}
+      limit: 1
+    ) {
+      id
+      teacherId
+      sectionId
+      createdAt
+      updatedAt
+      assignedBy {
+        id
+        fullName
+        role
+      }
+      teacher {
+        id
+        employeeId
+        staffType
+        user {
+          id
+          fullName
+          phoneNumber
+          employeeId
+          role
+          roles: userRoles_on_user {
+            role
+          }
+        }
+      }
+    }
+  }
+  students(where: {branchId: {eq: $branchId}, status: {eq: "ACTIVE"}}, limit: 1000) {
+    id
+    sectionId
+  }
+  attendances(where: {section: {branchId: {eq: $branchId}}}, limit: 1000) {
+    id
+    sectionId
+    status
+  }
+}
+
+query GetSectionsByClassAndYear($branchId: UUID!, $academicClassId: UUID!, $academicYear: Int!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, (u.branchId == vars.branchId) || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Branch access required") {
+    id
+    role
+    branchId
+  }
+  sections(
+    where: {
+      branchId: {eq: $branchId}
+      academicClassId: {eq: $academicClassId}
+      academicYear: {eq: $academicYear}
+      isActive: {eq: true}
+    }
+    orderBy: {name: ASC}
+  ) {
+    id
+    branchId
+    wingId
+    academicClassId
+    name
+    academicYear
+    classTeacherId
+    isActive
+  }
+}
+
+query GetPrincipalDashboard($branchId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, (u.role == 'PRINCIPAL' || u.role == 'principal') && u.branchId == vars.branchId)", message: "Principal branch access required") {
+    id
+    role
+    branchId
+  }
+  students(where: {branchId: {eq: $branchId}, status: {eq: "ACTIVE"}}, limit: 1000) {
+    id
+  }
+  teachers: teachers(where: {branchId: {eq: $branchId}, isActive: {eq: true}}, limit: 1000) {
+    id
+  }
+  coordinators(where: {branchId: {eq: $branchId}, isActive: {eq: true}}, limit: 20) {
+    id
+  }
+  sections(where: {branchId: {eq: $branchId}, isActive: {eq: true}}, limit: 1000) {
+    id
+  }
+  pendingPromotions: students(where: {branchId: {eq: $branchId}, status: {eq: "ACTIVE"}}, limit: 1000) {
+    id
+    academicClass {
+      id
+      name
+      wing {
+        id
+        code
+        name
+      }
+    }
+  }
+}
+
+query GetStudentsByWing($branchId: UUID!, $wing: String!, $limit: Int = 50, $offset: Int = 0) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, ((u.role == 'COORDINATOR' || u.role == 'coordinator') && u.branchId == vars.branchId) || ((u.role == 'PRINCIPAL' || u.role == 'principal' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin') && u.branchId == vars.branchId) || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Branch access required") {
+    id
+    role
+    branchId
+  }
+  students(
+    where: {branchId: {eq: $branchId}, status: {eq: "ACTIVE"}, academicClass: {wing: {code: {eq: $wing}}}}
+    limit: $limit
+    offset: $offset
+  ) {
+    id
+    studentId
+    fullName
+    gender
+    branchId
+    academicClassId
+    sectionId
+    parentId
+    phoneNumber
+    status
+    academicClass {
+      id
+      name
+      wing {
+        code
+        name
+      }
+    }
+    section {
+      id
+      name
+      academicYear
+    }
+  }
+}
+
+query GetCoordinatorStudentsByWing($branchId: UUID!, $wing: String!, $limit: Int = 50, $offset: Int = 0) @auth(level: USER) {
+  currentCoordinator: coordinators(
+    where: {
+      branchId: {eq: $branchId}
+      wing: {eq: $wing}
+      isActive: {eq: true}
+      user: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    }
+    limit: 1
+  ) @redact @check(expr: "this.exists(c, true)", message: "Coordinator wing access required") {
+    id
+  }
+  students(
+    where: {branchId: {eq: $branchId}, status: {eq: "ACTIVE"}, academicClass: {wing: {code: {eq: $wing}}}}
+    limit: $limit
+    offset: $offset
+  ) {
+    id
+    studentId
+    fullName
+    gender
+    branchId
+    academicClassId
+    sectionId
+    parentId
+    phoneNumber
+    status
+    academicClass {
+      id
+      name
+      wing {
+        code
+        name
+      }
+    }
+    section {
+      id
+      name
+      academicYear
+    }
+    parent {
+      id
+      fatherName
+      motherName
+      phoneNumber
+    }
+  }
+}
+
+query GetPromotionHistory($studentId: UUID) @auth(level: USER, insecureReason: "Promotion history is shown only from principal screens and service-layer branch checks; optional student filtering can be null for branch audit review.") {
+  studentPromotionHistories(where: {studentId: {eq: $studentId}}, limit: 100) {
+    id
+    studentId
+    fromClassId
+    toClassId
+    fromSectionId
+    toSectionId
+    promotedById
+    promotedAt
+    student {
+      id
+      studentId
+      fullName
+    }
+    fromClass {
+      id
+      name
+    }
+    toClass {
+      id
+      name
+    }
+    fromSection {
+      id
+      name
+    }
+    toSection {
+      id
+      name
+    }
+    promotedBy {
+      id
+      fullName
+    }
+  }
+}
+
+query GetStudentSequence($year: Int!, $branchCode: String!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, true)", message: "Authenticated user required") {
+    id
+  }
+  studentSequences(where: {year: {eq: $year}, branchCode: {eq: $branchCode}}, limit: 1) {
+    year
+    branchCode
+    lastSerial
+  }
+}
+
+query GenerateAdmissionNumber($year: Int!, $branchCode: String!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, true)", message: "Authenticated user required") {
+    id
+  }
+  studentSequences(where: {year: {eq: $year}, branchCode: {eq: $branchCode}}, limit: 1) {
+    year
+    branchCode
+    lastSerial
+  }
+}
+
+query GetLastStudentSerial($admissionYear: Int!, $branchCode: String!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, true)", message: "Authenticated user required") {
+    id
+  }
+  students(
+    where: {admissionYear: {eq: $admissionYear}, branchCode: {eq: $branchCode}}
+    orderBy: {serialNumber: DESC}
+    limit: 1
+  ) {
+    id
+    studentId
+    serialNumber
+  }
+}
+
+query GetTeachers($branchId: UUID!, $limit: Int = 50, $offset: Int = 0) @auth(level: USER) {
+  currentUser: users(
+    where: {
+      _and: [
+        {firebaseUID: {eq_expr: "auth.uid"}}
+        {isActive: {eq: true}}
+        {
+          _or: [
+            {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+            {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+            {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+            {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+            {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+            {
+              _and: [
+                {branchId: {eq: $branchId}}
+                {
+                  _or: [
+                    {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                    {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                    ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, true)", message: "Branch teacher access required") {
+    id
+    role
+    branchId
+  }
+  teachers(where: {branchId: {eq: $branchId}}, orderBy: {createdAt: DESC}, limit: $limit, offset: $offset) {
+    id
+    userId
+    employeeId
+    staffType
+    branchId
+    wing @retired
+    joiningDate
+    designation
+    gender
+    email
+    qualification
+    experience
+    isActive
+    user {
+      id
+      fullName
+      phoneNumber
+      countryCode
+      role
+      staffType
+      isActive
+      roles: userRoles_on_user {
+        role
+      }
+    }
+    teacherSubjects_on_teacher {
+      id
+      subject {
+        id
+        name
+        code
+        status
+      }
+    }
+    assignments: teacherSectionAssignments_on_teacher(where: {isActive: {eq: true}}) {
+      id
+      sectionId
+      isClassTeacher
+      isActive
+      section {
+        id
+        name
+        academicYear
+        academicClass {
+          id
+          name
+          wing {
+            code
+            name
+          }
+        }
+      }
+    }
+  }
+}
+
+query GetTeachersByBranch($branchId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, ((u.role == 'PRINCIPAL' || u.role == 'principal' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin') && u.branchId == vars.branchId) || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Branch access required") {
+    id
+    role
+    branchId
+  }
+  users(where: {branchId: {eq: $branchId}, role: {eq: "TEACHER"}, isActive: {eq: true}}, limit: 500) {
+    id
+    fullName
+    phoneNumber
+    role
+    employeeId
+    staffType
+    branchId
+  }
+}
+
+query GetTeachersByWing($branchId: UUID!, $wing: String!, $limit: Int = 50, $offset: Int = 0) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, ((u.role == 'COORDINATOR' || u.role == 'coordinator' || u.role == 'PRINCIPAL' || u.role == 'principal' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin') && u.branchId == vars.branchId) || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Branch access required") {
+    id
+    role
+    branchId
+  }
+  teachers(where: {branchId: {eq: $branchId}}, orderBy: {createdAt: DESC}, limit: $limit, offset: $offset) {
+    id
+    userId
+    employeeId
+    staffType
+    branchId
+    wing @retired
+    joiningDate
+    designation
+    gender
+    email
+    qualification
+    experience
+    isActive
+    user {
+      id
+      fullName
+      phoneNumber
+      countryCode
+      role
+      staffType
+      isActive
+      roles: userRoles_on_user {
+        role
+      }
+    }
+    teacherSubjects_on_teacher {
+      id
+      subject {
+        id
+        name
+        code
+        status
+      }
+    }
+    assignments: teacherSectionAssignments_on_teacher(where: {isActive: {eq: true}}) {
+      id
+      sectionId
+      isClassTeacher
+      isActive
+      section {
+        id
+        name
+        academicYear
+        academicClass {
+          id
+          name
+          wing {
+            code
+            name
+          }
+        }
+      }
+    }
+  }
+}
+
+query GetCoordinatorTeachersByWing($branchId: UUID!, $wing: String!, $limit: Int = 50, $offset: Int = 0) @auth(level: USER) {
+  currentCoordinator: coordinators(
+    where: {
+      branchId: {eq: $branchId}
+      wing: {eq: $wing}
+      isActive: {eq: true}
+      user: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    }
+    limit: 1
+  ) @redact @check(expr: "this.exists(c, true)", message: "Coordinator wing access required") {
+    id
+  }
+  teachers(where: {branchId: {eq: $branchId}}, orderBy: {createdAt: DESC}, limit: $limit, offset: $offset) {
+    id
+    userId
+    employeeId
+    staffType
+    branchId
+    wing @retired
+    joiningDate
+    designation
+    gender
+    email
+    qualification
+    experience
+    isActive
+    user {
+      id
+      fullName
+      phoneNumber
+      countryCode
+      role
+      staffType
+      isActive
+      roles: userRoles_on_user {
+        role
+      }
+    }
+    teacherSubjects_on_teacher {
+      id
+      subject {
+        id
+        name
+        code
+        status
+      }
+    }
+    assignments: teacherSectionAssignments_on_teacher(where: {isActive: {eq: true}}) {
+      id
+      sectionId
+      isClassTeacher
+      isActive
+      section {
+        id
+        name
+        academicYear
+        academicClass {
+          id
+          name
+          wing {
+            code
+            name
+          }
+        }
+      }
+    }
+  }
+}
+
+query GetTeacherProfile($teacherId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, true)", message: "Authenticated user required") {
+    id
+    role
+    branchId
+  }
+  teacher(id: $teacherId) {
+    id
+    userId
+    employeeId
+    staffType
+    branchId
+    wing @retired
+    joiningDate
+    designation
+    gender
+    alternateMobileNumber
+    email
+    dateOfBirth
+    qualification
+    experience
+    address
+    city
+    state
+    pincode
+    emergencyContact
+    bloodGroup
+    isActive
+    user {
+      id
+      fullName
+      countryCode
+      phoneNumber
+      role
+      isActive
+      roles: userRoles_on_user {
+        role
+      }
+    }
+    branch {
+      id
+      name
+      branchCode
+    }
+    subjects: teacherSubjects_on_teacher {
+      id
+      subject {
+        id
+        name
+        code
+        status
+      }
+    }
+    assignments: teacherSectionAssignments_on_teacher(where: {isActive: {eq: true}}) {
+      id
+      sectionId
+      isClassTeacher
+      isActive
+      createdAt
+      assignedBy {
+        id
+        fullName
+        role
+      }
+      section {
+        id
+        name
+        academicYear
+        classTeacherId
+        students_on_section {
+          id
+        }
+        profileActiveStudents: students_on_section(where: {status: {eq: "ACTIVE"}, isActive: {eq: true}}, limit: 500) {
+          id
+          studentId
+          fullName
+          status
+        }
+        profileSectionAttendance: attendances_on_section(limit: 1000) {
+          id
+          studentId
+          attendanceDate
+          status
+          markedById
+        }
+        classTeacher {
+          id
+          fullName
+          phoneNumber
+        }
+        academicClass {
+          id
+          name
+          wing {
+            code
+            name
+          }
+        }
+      }
+    }
+    transferHistories: teacherTransferHistories_on_teacher(orderBy: {changedAt: DESC}, limit: 20) @retired {
+      id
+      oldWing
+      newWing
+      changedAt
+      changedBy {
+        id
+        fullName
+      }
+    }
+    attendanceMarked: user {
+      profileMarkedAttendance: attendances_on_markedBy(limit: 1000) {
+        id
+        attendanceDate
+        status
+        sectionId
+      }
+    }
+  }
+}
+
+query GetTeacherProfileByUser($userId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {
+      _and: [
+        {firebaseUID: {eq_expr: "auth.uid"}}
+        {isActive: {eq: true}}
+        {
+          _or: [
+            {id: {eq: $userId}}
+            {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+            {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+            ]
+        }
+      ]
+    }
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, true)", message: "Teacher profile access denied") {
+    id
+    role
+  }
+  teachers(where: {userId: {eq: $userId}, isActive: {eq: true}}, limit: 1) {
+    id
+    userId
+    employeeId
+    staffType
+    branchId
+    wing @retired
+    joiningDate
+    designation
+    gender
+    isActive
+    user {
+      id
+      fullName
+      phoneNumber
+      role
+      roles: userRoles_on_user {
+        role
+      }
+    }
+    assignments: teacherSectionAssignments_on_teacher(where: {isActive: {eq: true}}) {
+      id
+      sectionId
+      isClassTeacher
+      isActive
+      createdAt
+      assignedBy {
+        id
+        fullName
+        role
+      }
+      section {
+        id
+        name
+        academicClass {
+          id
+          name
+          wing {
+            code
+            name
+          }
+        }
+      }
+    }
+  }
+}
+
+query GetTeacherDashboard($teacherId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, true)", message: "Authenticated user required") {
+    id
+  }
+  teacher(id: $teacherId) {
+    id
+    userId
+    branchId
+    wing @retired
+    employeeId
+    staffType
+    designation
+    user {
+      id
+      fullName
+      phoneNumber
+      role
+      roles: userRoles_on_user {
+        role
+      }
+      dashboardMarkedAttendance: attendances_on_markedBy(limit: 1000) {
+        id
+        attendanceDate
+        status
+        sectionId
+      }
+    }
+    teacherSubjects_on_teacher {
+      id
+      subject {
+        id
+        name
+        code
+      }
+    }
+    assignments: teacherSectionAssignments_on_teacher(where: {isActive: {eq: true}}) {
+      id
+      sectionId
+      isClassTeacher
+      isActive
+      section {
+        id
+        name
+        academicYear
+        classTeacherId
+        students_on_section {
+          id
+        }
+        dashboardActiveStudents: students_on_section(where: {status: {eq: "ACTIVE"}, isActive: {eq: true}}, limit: 500) {
+          id
+          studentId
+          fullName
+          status
+        }
+        dashboardSectionAttendance: attendances_on_section(limit: 1000) {
+          id
+          studentId
+          attendanceDate
+          status
+          markedById
+        }
+        classTeacher {
+          id
+          fullName
+        }
+        academicClass {
+          id
+          name
+          wing {
+            code
+            name
+          }
+        }
+      }
+    }
+  }
+}
+
+query GetSubjects($limit: Int = 100, $offset: Int = 0) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, true)", message: "Authenticated user required") {
+    id
+  }
+  subjects(orderBy: {name: ASC}, limit: $limit, offset: $offset) {
+    id
+    name
+    code
+    status
+  }
+}
+query GetSectionsForTeacherAssignment($branchId: UUID!, $wing: String, $academicYear: Int!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, (u.branchId == vars.branchId) || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Branch access required") {
+    id
+    role
+    branchId
+  }
+  sections(where: {branchId: {eq: $branchId}, academicYear: {eq: $academicYear}, isActive: {eq: true}}, limit: 500) {
+    id
+    branchId
+    wingId
+    academicClassId
+    name
+    academicYear
+    classTeacherId
+    academicClass {
+      id
+      name
+      wing {
+        id
+        code
+        name
+      }
+    }
+    classTeacher {
+      id
+      fullName
+      phoneNumber
+    }
+  }
+}
+
+query GetAccountants($branchId: UUID!, $limit: Int = 50, $offset: Int = 0) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, ((u.role == 'PRINCIPAL' || u.role == 'principal' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin') && u.branchId == vars.branchId) || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Accountant management access required") {
+    id
+    role
+    branchId
+  }
+  accountants(where: {branchId: {eq: $branchId}}, orderBy: {createdAt: DESC}, limit: $limit, offset: $offset) {
+    id
+    userId
+    employeeId
+    staffType
+    branchId
+    joiningDate
+    designation
+    gender
+    email
+    qualification
+    experience
+    isActive
+    user {
+      id
+      fullName
+      countryCode
+      phoneNumber
+      role
+      staffType
+      isActive
+    }
+    branch {
+      id
+      name
+      branchCode
+    }
+  }
+}
+
+query GetAccountantProfile($accountantId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'PRINCIPAL' || u.role == 'principal' || u.role == 'ACCOUNTANT' || u.role == 'accountant' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin' || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Accountant profile access required") {
+    id
+    role
+    branchId
+  }
+  accountant(id: $accountantId) {
+    id
+    userId
+    employeeId
+    staffType
+    branchId
+    joiningDate
+    designation
+    gender
+    email
+    qualification
+    experience
+    address
+    city
+    state
+    pincode
+    emergencyContact
+    bloodGroup
+    isActive
+    user {
+      id
+      fullName
+      countryCode
+      phoneNumber
+      role
+      staffType
+      isActive
+    }
+    branch {
+      id
+      name
+      branchCode
+    }
+  }
+}
+
+query GetAccountantByUser($userId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.id == vars.userId || u.role == 'PRINCIPAL' || u.role == 'principal' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin' || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Accountant profile access denied") {
+    id
+    role
+  }
+  accountants(where: {userId: {eq: $userId}, isActive: {eq: true}}, limit: 1) {
+    id
+    userId
+    employeeId
+    staffType
+    branchId
+    branch {
+      id
+      branchCode
+      name
+    }
+    joiningDate
+    designation
+    gender
+    isActive
+  }
+}
+
+query GetFeeCategories($limit: Int = 100, $offset: Int = 0) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, true)", message: "Authenticated user required") {
+    id
+  }
+  feeCategories(orderBy: {name: ASC}, limit: $limit, offset: $offset) {
+    id
+    name
+    status
+    createdAt
+  }
+}
+
+query GetClassTeacherAssignments($branchId: UUID!, $academicYear: Int!, $limit: Int = 500) @auth(level: USER)
+  @refresh(onMutationExecuted: {operation: "AssignTeacherClassTeacher"})
+  @refresh(onMutationExecuted: {operation: "UpdateClassTeacherAssignment"})
+  @refresh(onMutationExecuted: {operation: "RemoveClassTeacherAssignment"})
+  @refresh(onMutationExecuted: {operation: "RemoveLegacyClassTeacherAssignment"}) {
+  currentUser: users(
+    where: {
+      _and: [
+        {firebaseUID: {eq_expr: "auth.uid"}}
+        {isActive: {eq: true}}
+        {
+          _or: [
+            {branchId: {eq: $branchId}}
+            {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+            {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+            {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+            {branches_on_branchAdmin: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+            {coordinators_on_user: {exist: {branchId: {eq: $branchId}, isActive: {eq: true}}}}
+          ]
+        }
+      ]
+    }
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, true)", message: "Class teacher assignment access required") {
+    id
+    role
+    branchId
+  }
+  sections(
+    where: {branchId: {eq: $branchId}, academicYear: {eq: $academicYear}, isActive: {eq: true}}
+    orderBy: {name: ASC}
+    limit: $limit
+  ) {
+    id
+    branchId
+    wingId
+    academicClassId
+    name
+    academicYear
+    classTeacherId
+    isActive
+    academicClass {
+      id
+      name
+      sortOrder
+      wing {
+        id
+        code
+        name
+      }
+    }
+    classTeacher {
+      id
+      fullName
+      phoneNumber
+      employeeId
+      staffType
+      role
+      roles: userRoles_on_user {
+        role
+      }
+      teacherProfile: teacher_on_user {
+        id
+        userId
+        employeeId
+        staffType
+        branchId
+        isActive
+      }
+    }
+  }
+  teacherSectionAssignments(
+    where: {section: {branchId: {eq: $branchId}, academicYear: {eq: $academicYear}}, isClassTeacher: {eq: true}, isActive: {eq: true}}
+    orderBy: {createdAt: DESC}
+    limit: $limit
+  ) {
+    id
+    teacherId
+    sectionId
+    isClassTeacher
+    isActive
+    createdAt
+    updatedAt
+    assignedBy {
+      id
+      fullName
+      role
+    }
+    teacher {
+      id
+      employeeId
+      staffType
+      user {
+        id
+        fullName
+        phoneNumber
+        employeeId
+        role
+        roles: userRoles_on_user {
+          role
+        }
+        teacherProfile: teacher_on_user {
+          id
+          userId
+          employeeId
+          staffType
+          branchId
+          isActive
+        }
+      }
+    }
+    section {
+      id
+      branchId
+      wingId
+      name
+      academicYear
+      classTeacherId
+      academicClass {
+        id
+        name
+        sortOrder
+        wing {
+          id
+          code
+          name
+        }
+      }
+    }
+  }
+  students(where: {branchId: {eq: $branchId}, status: {eq: "ACTIVE"}, isActive: {eq: true}}, limit: 1000) {
+    id
+    sectionId
+  }
+  coordinators(where: {branchId: {eq: $branchId}, isActive: {eq: true}}, orderBy: {createdAt: DESC}, limit: $limit) {
+    id
+    wing
+    user {
+      id
+      fullName
+      employeeId
+      phoneNumber
+      role
+      staffType
+      roles: userRoles_on_user {
+        role
+      }
+      teacherProfile: teacher_on_user {
+        id
+        userId
+        employeeId
+        staffType
+        branchId
+        joiningDate
+        designation
+        gender
+        email
+        isActive
+      }
+    }
+  }
+}
+
+query GetClassFees($branchId: UUID!, $academicYear: Int, $limit: Int = 200, $offset: Int = 0) @auth(level: USER)
+  @refresh(onMutationExecuted: {operation: "CreateClassFee"})
+  @refresh(onMutationExecuted: {operation: "UpdateClassFee"})
+  @refresh(onMutationExecuted: {operation: "CreateFeePlan"})
+  @refresh(onMutationExecuted: {operation: "UpdateFeePlan"}) {
+  currentUser: users(
+    where: {
+      _and: [
+        {firebaseUID: {eq_expr: "auth.uid"}}
+        {isActive: {eq: true}}
+        {
+          _or: [
+            {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+            {
+              _and: [
+                {branchId: {eq: $branchId}}
+                {
+                  _or: [
+                    {role: {eq: "COORDINATOR"}}
+                    {role: {eq: "coordinator"}}
+                    {role: {eq: "PRINCIPAL"}}
+                    {role: {eq: "principal"}}
+                    {role: {eq: "BRANCH_ADMIN"}}
+                    {role: {eq: "branch_admin"}}
+                    {role: {eq: "ACCOUNTANT"}}
+                    {role: {eq: "accountant"}}
+                    {role: {eq: "TEACHER"}}
+                    {role: {eq: "teacher"}}
+                    {role: {eq: "CLASS_TEACHER"}}
+                    {role: {eq: "class_teacher"}}
+                    ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, true)", message: "Class fee access required") {
+    id
+    role
+    branchId
+  }
+  academicYearFeeTemplates(
+    where: {branchId: {eq: $branchId}, academicYear: {eq: $academicYear}}
+    limit: $limit
+    offset: $offset
+  ) {
+    id
+    branchId
+    academicClassId
+    academicYear
+    term1Fee
+    term2Fee
+    term3Fee
+    totalTuitionFee
+    applyToFuture
+    status
+    createdAt
+    updatedAt
+    academicClass {
+      id
+      name
+      classCode
+      sortOrder
+      wing {
+        id
+        code
+        name
+      }
+    }
+    createdBy {
+      id
+      fullName
+    }
+  }
+}
+
+query GetStudentFeeProfile($studentId: UUID!, $actorRole: String, $actorRoleAlias: String) @auth(level: USER) {
+  currentUser: users(
+    where: {
+      _and: [
+        {firebaseUID: {eq_expr: "auth.uid"}}
+        {isActive: {eq: true}}
+        {
+          _or: [
+            {role: {in: ["MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin", "PRINCIPAL", "principal", "COORDINATOR", "coordinator", "ACCOUNTANT", "accountant", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}
+            {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin", "PRINCIPAL", "principal", "COORDINATOR", "coordinator", "ACCOUNTANT", "accountant", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}}}
+          ]
+        }
+      ]
+    }
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, true)", message: "Student fee access required") {
+    id
+    role
+    branchId
+  }
+  student(id: $studentId) {
+    id
+    studentId
+    fullName
+    branchId
+    academicClass {
+      id
+      name
+      wing {
+        id
+        code
+        name
+      }
+    }
+    section {
+      id
+      name
+    }
+    parent {
+      id
+      fullName
+      fatherName
+      motherName
+      phoneNumber
+    }
+    profileLinkedParents: studentParents_on_student {
+      userId
+    }
+    branch {
+      id
+      name
+      branchCode
+    }
+    profileFeePlans: studentFeePlans_on_student(orderBy: {academicYear: DESC}, limit: 10) {
+      id
+      academicYear
+      classFeeTemplateId
+      term1Fee
+      term2Fee
+      term3Fee
+      booksFee
+      transportFee
+      concessionType
+      concessionValue
+      concessionAmount
+      grossAmount
+      totalAmount
+      previousYearDue
+      carryForwardAmount
+      isActive
+      createdAt
+      classFeeTemplate {
+        id
+        totalTuitionFee
+        applyToFuture
+        status
+      }
+      createdBy {
+        id
+        fullName
+      }
+      profileFeeItems: studentFeeItems_on_feePlan {
+        id
+        amount
+        category {
+          id
+          name
+          status
+        }
+      }
+      profileFeePayments: feePayments_on_feePlan(orderBy: {paymentDate: DESC}, limit: 200) {
+        id
+        amount
+        academicYear
+        paymentDate
+        paymentMode
+        referenceNumber
+        receiptNumber
+        status
+        reversedAt
+        reverseReason
+        remarks
+        collectedBy {
+          id
+          fullName
+        }
+        reversedBy {
+          id
+          fullName
+        }
+      }
+    }
+  }
+}
+
+# Branch-wide payment history. Per-student history is served separately via
+# GetStudentFeeProfile, so this query never needs a studentId predicate — the
+# previous `studentId: {eq: $studentId}` (always null here) translated to SQL
+# `studentId = NULL` and returned zero rows. Year scoping is applied client-side
+# in feeService from the selected `academicYear` field below.
+query GetPaymentHistory(
+  $branchId: UUID!
+  $fromDate: Date
+  $toDate: Date
+  $limit: Int = 200
+  $offset: Int = 0
+) @auth(level: USER) {
+  currentUser: users(
+    where: {
+      _and: [
+        {firebaseUID: {eq_expr: "auth.uid"}}
+        {isActive: {eq: true}}
+      ]
+    }
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin' || u.branchId == vars.branchId || u.role == 'ACCOUNTANT' || u.role == 'accountant')", message: "Payment history access required") {
+    id
+    role
+    branchId
+  }
+  feePayments(
+    where: {
+      student: {branchId: {eq: $branchId}}
+      paymentDate: {ge: $fromDate, le: $toDate}
+    }
+    orderBy: {paymentDate: DESC}
+    limit: $limit
+    offset: $offset
+  ) {
+    id
+    studentId
+    feePlanId
+    amount
+    academicYear
+    paymentDate
+    paymentMode
+    referenceNumber
+    receiptNumber
+    status
+    reversedAt
+    reverseReason
+    remarks
+    student {
+      id
+      studentId
+      fullName
+      academicClass {
+        id
+        name
+        wing {
+          id
+          code
+          name
+        }
+      }
+      section {
+        id
+        name
+      }
+      branch {
+        id
+        name
+        branchCode
+      }
+    }
+    collectedBy {
+      id
+      fullName
+    }
+    reversedBy {
+      id
+      fullName
+    }
+  }
+}
+
+query GetReceiptSequence($year: Int!, $branchCode: String!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, true)", message: "Authenticated user required") {
+    id
+  }
+  receiptSequences(where: {year: {eq: $year}, branchCode: {eq: $branchCode}}, limit: 1) {
+    year
+    branchCode
+    lastSequence
+  }
+}
+
+query GetFeeReports($branchId: UUID!, $limit: Int = 1000, $offset: Int = 0) @auth(level: USER)
+  @refresh(onMutationExecuted: {operation: "CreateClassFee"})
+  @refresh(onMutationExecuted: {operation: "UpdateClassFee"})
+  @refresh(onMutationExecuted: {operation: "CreateFeePlan"})
+  @refresh(onMutationExecuted: {operation: "UpdateFeePlan"})
+  @refresh(onMutationExecuted: {operation: "RecordPayment"})
+  @refresh(onMutationExecuted: {operation: "UpdatePayment"})
+  @refresh(onMutationExecuted: {operation: "ReversePayment"}) {
+  currentUser: users(
+    where: {
+      _and: [
+        {firebaseUID: {eq_expr: "auth.uid"}}
+        {isActive: {eq: true}}
+      ]
+    }
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin' || u.branchId == vars.branchId || u.role == 'ACCOUNTANT' || u.role == 'accountant')", message: "Fee report access required") {
+    id
+    role
+    branchId
+  }
+  students(where: {branchId: {eq: $branchId}, isActive: {eq: true}}, limit: $limit, offset: $offset) {
+    id
+    studentId
+    fullName
+    academicClass {
+      id
+      name
+      wing {
+        id
+        code
+        name
+      }
+    }
+    section {
+      id
+      name
+    }
+    branchId
+    reportLinkedParents: studentParents_on_student {
+      userId
+    }
+    reportFeePlans: studentFeePlans_on_student(limit: 20) {
+      id
+      academicYear
+      classFeeTemplateId
+      term1Fee
+      term2Fee
+      term3Fee
+      booksFee
+      transportFee
+      concessionType
+      concessionValue
+      concessionAmount
+      grossAmount
+      totalAmount
+      previousYearDue
+      carryForwardAmount
+      isActive
+      reportFeePayments: feePayments_on_feePlan(limit: 200) {
+        id
+        amount
+        academicYear
+        paymentDate
+        paymentMode
+        receiptNumber
+        status
+      }
+      reportFeeItems: studentFeeItems_on_feePlan {
+        id
+        amount
+        category {
+          id
+          name
+        }
+      }
+    }
+  }
+}
+
+query GetGlobalStudentExplorer(
+  $branchId: UUID
+  $academicClassId: UUID
+  $sectionId: UUID
+  $status: String
+  $searchText: String! = ""
+  $limit: Int = 25
+  $offset: Int = 0
+) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Main Admin required") {
+    id
+    role
+  }
+  students(
+    where: {
+      _and: [
+        {branchId: {eq: $branchId}}
+        {academicClassId: {eq: $academicClassId}}
+        {sectionId: {eq: $sectionId}}
+        {status: {eq: $status}}
+        {
+          _or: [
+            {studentId: {contains: $searchText}}
+            {fullName: {contains: $searchText}}
+            {phoneNumber: {contains: $searchText}}
+            {parent: {phoneNumber: {contains: $searchText}}}
+            {parent: {fatherName: {contains: $searchText}}}
+            {parent: {motherName: {contains: $searchText}}}
+          ]
+        }
+      ]
+    }
+    orderBy: {fullName: ASC}
+    limit: $limit
+    offset: $offset
+  ) {
+    id
+    studentId
+    fullName
+    gender
+    branchId
+    wingId
+    academicClassId
+    sectionId
+    parentId
+    phoneNumber
+    admissionDate
+    status
+    isActive
+    branch {
+      id
+      name
+      branchCode
+    }
+    academicClass {
+      id
+      name
+      wing {
+        id
+        code
+        name
+      }
+    }
+    section {
+      id
+      name
+    }
+    parent {
+      id
+      fullName
+      fatherName
+      motherName
+      phoneNumber
+      email
+    }
+    explorerAttendance: attendances_on_student(limit: 500) {
+      id
+      status
+    }
+    explorerFeePlans: studentFeePlans_on_student(limit: 10) {
+      id
+      totalAmount
+      explorerFeePayments: feePayments_on_feePlan(limit: 200) {
+        id
+        amount
+        status
+      }
+    }
+  }
+}
+
+query GetGlobalReports @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Main Admin required") {
+    id
+    role
+  }
+  branches(limit: 1000) {
+    id
+    name
+    branchCode
+    status
+    isActive
+  }
+  users(where: {isActive: {eq: true}}, limit: 2000) {
+    id
+    branchId
+    role
+    isActive
+  }
+  coordinators(where: {isActive: {eq: true}}, limit: 2000) {
+    id
+    branchId
+  }
+  accountants(where: {isActive: {eq: true}}, limit: 2000) {
+    id
+    branchId
+  }
+  students(limit: 5000) {
+    id
+    branchId
+    status
+    isActive
+    admissionDate
+  }
+  attendances(limit: 5000) {
+    id
+    sectionId
+    status
+    attendanceDate
+    section {
+      id
+      branchId
+    }
+  }
+  studentFeePlans(limit: 5000) {
+    id
+    studentId
+    grossAmount
+    concessionAmount
+    totalAmount
+    isActive
+    student {
+      id
+      branchId
+    }
+    reportPayments: feePayments_on_feePlan(limit: 1000) {
+      id
+      amount
+      status
+      paymentDate
+    }
+  }
+}
+
+query GetAuditLogs($branchId: UUID, $limit: Int = 100, $offset: Int = 0) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Main Admin required") {
+    id
+    role
+  }
+  auditLogs(where: {branchId: {eq: $branchId}}, orderBy: {createdAt: DESC}, limit: $limit, offset: $offset) {
+    id
+    userId
+    performedBy
+    performedRole
+    actingAs
+    branchId
+    action
+    entityType
+    entityId
+    oldRole
+    newRole
+    oldData
+    newData
+    createdAt
+  }
+}
+
+query GetClassFeeReport(
+  $branchId: UUID!
+  $academicClassId: UUID!
+  $sectionId: UUID
+  $academicYear: Int!
+  $limit: Int = 200
+  $offset: Int = 0
+) @auth(level: USER)
+  @refresh(onMutationExecuted: {operation: "CreateClassFee"})
+  @refresh(onMutationExecuted: {operation: "UpdateClassFee"})
+  @refresh(onMutationExecuted: {operation: "CreateFeePlan"})
+  @refresh(onMutationExecuted: {operation: "UpdateFeePlan"})
+  @refresh(onMutationExecuted: {operation: "RecordPayment"})
+  @refresh(onMutationExecuted: {operation: "UpdatePayment"})
+  @refresh(onMutationExecuted: {operation: "ReversePayment"}) {
+  currentUser: users(
+    where: {
+      _and: [
+        {firebaseUID: {eq_expr: "auth.uid"}}
+        {isActive: {eq: true}}
+      ]
+    }
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin' || u.branchId == vars.branchId || u.role == 'ACCOUNTANT' || u.role == 'accountant')", message: "Fee report access required") {
+    id
+    role
+    branchId
+  }
+  students(
+    where: {
+      branchId: {eq: $branchId}
+      academicClassId: {eq: $academicClassId}
+      sectionId: {eq: $sectionId}
+      isActive: {eq: true}
+    }
+    limit: $limit
+    offset: $offset
+  ) {
+    id
+    studentId
+    fullName
+    academicClass {
+      id
+      name
+      wing {
+        id
+        code
+        name
+      }
+    }
+    section {
+      id
+      name
+    }
+    classReportFeePlans: studentFeePlans_on_student(
+      where: {academicYear: {eq: $academicYear}}
+      limit: 1
+    ) {
+      id
+      academicYear
+      term1Fee
+      term2Fee
+      term3Fee
+      booksFee
+      transportFee
+      concessionType
+      concessionValue
+      concessionAmount
+      grossAmount
+      totalAmount
+      isActive
+      classReportFeePayments: feePayments_on_feePlan(limit: 100) {
+        id
+        amount
+        paymentDate
+        paymentMode
+        receiptNumber
+        status
+      }
+    }
+  }
+}
+
+query GetClassStudentsFeeStatus(
+  $branchId: UUID!
+  $academicClassId: UUID!
+  $sectionId: UUID
+  $academicYear: Int!
+  $limit: Int = 200
+  $offset: Int = 0
+) @auth(level: USER)
+  @refresh(onMutationExecuted: {operation: "CreateClassFee"})
+  @refresh(onMutationExecuted: {operation: "UpdateClassFee"})
+  @refresh(onMutationExecuted: {operation: "CreateFeePlan"})
+  @refresh(onMutationExecuted: {operation: "UpdateFeePlan"})
+  @refresh(onMutationExecuted: {operation: "RecordPayment"})
+  @refresh(onMutationExecuted: {operation: "UpdatePayment"})
+  @refresh(onMutationExecuted: {operation: "ReversePayment"}) {
+  currentUser: users(
+    where: {
+      _and: [
+        {firebaseUID: {eq_expr: "auth.uid"}}
+        {isActive: {eq: true}}
+      ]
+    }
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin' || u.branchId == vars.branchId || u.role == 'ACCOUNTANT' || u.role == 'accountant')", message: "Fee report access required") {
+    id
+    role
+    branchId
+  }
+  students(
+    where: {
+      branchId: {eq: $branchId}
+      academicClassId: {eq: $academicClassId}
+      sectionId: {eq: $sectionId}
+      isActive: {eq: true}
+    }
+    limit: $limit
+    offset: $offset
+  ) {
+    id
+    studentId
+    fullName
+    academicClass {
+      id
+      name
+      wing {
+        id
+        code
+        name
+      }
+    }
+    section {
+      id
+      name
+    }
+    classStatusFeePlans: studentFeePlans_on_student(
+      where: {academicYear: {eq: $academicYear}}
+      limit: 1
+    ) {
+      id
+      academicYear
+      term1Fee
+      term2Fee
+      term3Fee
+      booksFee
+      transportFee
+      concessionType
+      concessionValue
+      concessionAmount
+      grossAmount
+      totalAmount
+      isActive
+      classStatusFeePayments: feePayments_on_feePlan(limit: 100) {
+        id
+        amount
+        paymentDate
+        paymentMode
+        receiptNumber
+        status
+      }
+    }
+  }
+}
+
+query GetClassCollectionSummary(
+  $branchId: UUID!
+  $academicClassId: UUID!
+  $sectionId: UUID
+  $academicYear: Int!
+  $limit: Int = 200
+  $offset: Int = 0
+) @auth(level: USER)
+  @refresh(onMutationExecuted: {operation: "CreateClassFee"})
+  @refresh(onMutationExecuted: {operation: "UpdateClassFee"})
+  @refresh(onMutationExecuted: {operation: "CreateFeePlan"})
+  @refresh(onMutationExecuted: {operation: "UpdateFeePlan"})
+  @refresh(onMutationExecuted: {operation: "RecordPayment"})
+  @refresh(onMutationExecuted: {operation: "UpdatePayment"})
+  @refresh(onMutationExecuted: {operation: "ReversePayment"}) {
+  currentUser: users(
+    where: {
+      _and: [
+        {firebaseUID: {eq_expr: "auth.uid"}}
+        {isActive: {eq: true}}
+      ]
+    }
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin' || u.branchId == vars.branchId || u.role == 'ACCOUNTANT' || u.role == 'accountant')", message: "Fee report access required") {
+    id
+    role
+    branchId
+  }
+  students(
+    where: {
+      branchId: {eq: $branchId}
+      academicClassId: {eq: $academicClassId}
+      sectionId: {eq: $sectionId}
+      isActive: {eq: true}
+    }
+    limit: $limit
+    offset: $offset
+  ) {
+    id
+    studentId
+    fullName
+    academicClass {
+      id
+      name
+      wing {
+        id
+        code
+        name
+      }
+    }
+    section {
+      id
+      name
+    }
+    classCollectionFeePlans: studentFeePlans_on_student(
+      where: {academicYear: {eq: $academicYear}}
+      limit: 1
+    ) {
+      id
+      academicYear
+      term1Fee
+      term2Fee
+      term3Fee
+      booksFee
+      transportFee
+      concessionType
+      concessionValue
+      concessionAmount
+      grossAmount
+      totalAmount
+      isActive
+      classCollectionFeePayments: feePayments_on_feePlan(limit: 100) {
+        id
+        amount
+        paymentDate
+        paymentMode
+        receiptNumber
+        status
+      }
+    }
+  }
+}
+
+query GetClassOutstandingSummary(
+  $branchId: UUID!
+  $academicClassId: UUID!
+  $sectionId: UUID
+  $academicYear: Int!
+  $limit: Int = 200
+  $offset: Int = 0
+) @auth(level: USER)
+  @refresh(onMutationExecuted: {operation: "CreateClassFee"})
+  @refresh(onMutationExecuted: {operation: "UpdateClassFee"})
+  @refresh(onMutationExecuted: {operation: "CreateFeePlan"})
+  @refresh(onMutationExecuted: {operation: "UpdateFeePlan"})
+  @refresh(onMutationExecuted: {operation: "RecordPayment"})
+  @refresh(onMutationExecuted: {operation: "UpdatePayment"})
+  @refresh(onMutationExecuted: {operation: "ReversePayment"}) {
+  currentUser: users(
+    where: {
+      _and: [
+        {firebaseUID: {eq_expr: "auth.uid"}}
+        {isActive: {eq: true}}
+      ]
+    }
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin' || u.branchId == vars.branchId || u.role == 'ACCOUNTANT' || u.role == 'accountant')", message: "Fee report access required") {
+    id
+    role
+    branchId
+  }
+  students(
+    where: {
+      branchId: {eq: $branchId}
+      academicClassId: {eq: $academicClassId}
+      sectionId: {eq: $sectionId}
+      isActive: {eq: true}
+    }
+    limit: $limit
+    offset: $offset
+  ) {
+    id
+    studentId
+    fullName
+    academicClass {
+      id
+      name
+      wing {
+        id
+        code
+        name
+      }
+    }
+    section {
+      id
+      name
+    }
+    classOutstandingFeePlans: studentFeePlans_on_student(
+      where: {academicYear: {eq: $academicYear}}
+      limit: 1
+    ) {
+      id
+      academicYear
+      term1Fee
+      term2Fee
+      term3Fee
+      booksFee
+      transportFee
+      concessionType
+      concessionValue
+      concessionAmount
+      grossAmount
+      totalAmount
+      isActive
+      classOutstandingFeePayments: feePayments_on_feePlan(limit: 100) {
+        id
+        amount
+        paymentDate
+        paymentMode
+        receiptNumber
+        status
+      }
+    }
+  }
+}
+
+query GetUsersByPhone($phoneNumber: String!) @auth(level: USER) {
+  users(where: {phoneNumber: {eq: $phoneNumber}, isActive: {eq: true}}) {
+    id
+    firebaseUID
+    fullName
+    countryCode
+    phoneNumber
+    role
+    employeeId
+    staffType
+    branchId
+    wingId
+    branch {
+      id
+      branchCode
+      name
+    }
+    isActive
+  }
+}
+
+# ── Notice Board ─────────────────────────────────────────────────────────────
+
+query GetNoticesByBranch($branchId: UUID!, $limit: Int = 50, $offset: Int = 0) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin' || u.branchId == vars.branchId)", message: "Branch access denied") {
+    id
+    role
+    branchId
+  }
+  notices(
+    where: {branchId: {eq: $branchId}}
+    orderBy: {createdAt: DESC}
+    limit: $limit
+    offset: $offset
+  ) {
+    id
+    branchId
+    authorId
+    title
+    body
+    category
+    pinned
+    date
+    createdAt
+    updatedAt
+    author {
+      id
+      fullName
+    }
+  }
+}
+
+query GetNoticesByBranchCategory($branchId: UUID!, $category: String!, $limit: Int = 50, $offset: Int = 0) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin' || u.branchId == vars.branchId)", message: "Branch access denied") {
+    id
+    role
+    branchId
+  }
+  notices(
+    where: {branchId: {eq: $branchId}, category: {eq: $category}}
+    orderBy: {createdAt: DESC}
+    limit: $limit
+    offset: $offset
+  ) {
+    id
+    branchId
+    authorId
+    title
+    body
+    category
+    pinned
+    date
+    createdAt
+    updatedAt
+    author {
+      id
+      fullName
+    }
+  }
+}
+
+# ── Timetable ────────────────────────────────────────────────────────────────
+
+query GetTimetableForSection($sectionId: UUID!) @auth(level: USER) {
+  timetablePeriods(
+    where: {sectionId: {eq: $sectionId}, isActive: {eq: true}}
+    orderBy: {periodNum: ASC}
+    limit: 100
+  ) {
+    sectionId
+    branchId
+    teacherId
+    day
+    periodNum
+    subject
+    teacherName
+    room
+    status
+    startTime
+    endTime
+    timetableType
+    publishedById
+    publishedAt
+    isActive
+    section {
+      id
+      name
+      academicClass {
+        id
+        name
+      }
+    }
+  }
+}
+
+query GetTimetablesForBranch($branchId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin' || u.branchId == vars.branchId)", message: "Branch access denied") {
+    id
+    role
+    branchId
+  }
+  timetablePeriods(
+    where: {branchId: {eq: $branchId}, isActive: {eq: true}}
+    orderBy: {periodNum: ASC}
+    limit: 2000
+  ) {
+    sectionId
+    branchId
+    teacherId
+    day
+    periodNum
+    subject
+    teacherName
+    room
+    status
+    startTime
+    endTime
+    timetableType
+    publishedById
+    publishedAt
+    isActive
+    section {
+      id
+      name
+      wingId
+      academicClass {
+        id
+        name
+      }
+    }
+  }
+}
+
+query GetTimetablesForWing($branchId: UUID!, $wingId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin' || u.branchId == vars.branchId)", message: "Branch access denied") {
+    id
+    role
+    branchId
+  }
+  timetablePeriods(
+    where: {branchId: {eq: $branchId}, isActive: {eq: true}, section: {wingId: {eq: $wingId}}}
+    orderBy: {periodNum: ASC}
+    limit: 1000
+  ) {
+    sectionId
+    branchId
+    teacherId
+    day
+    periodNum
+    subject
+    teacherName
+    room
+    status
+    startTime
+    endTime
+    timetableType
+    publishedById
+    publishedAt
+    isActive
+    section {
+      id
+      name
+      wingId
+      academicClass {
+        id
+        name
+      }
+    }
+  }
+}
+
+query GetTimetableForTeacher($teacherId: UUID!, $branchId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin' || u.branchId == vars.branchId)", message: "Branch access denied") {
+    id
+    role
+    branchId
+  }
+  timetablePeriods(
+    where: {teacherId: {eq: $teacherId}, branchId: {eq: $branchId}, isActive: {eq: true}}
+    orderBy: {periodNum: ASC}
+    limit: 200
+  ) {
+    sectionId
+    branchId
+    teacherId
+    day
+    periodNum
+    subject
+    teacherName
+    room
+    status
+    startTime
+    endTime
+    timetableType
+    isActive
+    section {
+      id
+      name
+      academicClass {
+        id
+        name
+      }
+    }
+  }
+}
+
+# ── Suggestions ──────────────────────────────────────────────────────────────
+
+query GetSuggestionsByParent($parentId: UUID!, $limit: Int = 50) @auth(level: USER) {
+  currentParent: parents(
+    where: {id: {eq: $parentId}, user: {firebaseUID: {eq_expr: "auth.uid"}}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(p, true)", message: "Parent ownership required") {
+    id
+  }
+  suggestions(
+    where: {parentId: {eq: $parentId}}
+    orderBy: {createdAt: DESC}
+    limit: $limit
+  ) {
+    id
+    parentId
+    studentId
+    branchId
+    title
+    message
+    status
+    response
+    createdAt
+    updatedAt
+    student {
+      id
+      fullName
+    }
+  }
+}
+
+query GetSuggestionsByBranch($branchId: UUID!, $limit: Int = 100) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, (u.role == 'PRINCIPAL' || u.role == 'principal' || u.role == 'MAIN_ADMIN' || u.role == 'main_admin') && (u.branchId == vars.branchId || u.role == 'MAIN_ADMIN' || u.role == 'main_admin'))", message: "Principal or Main Admin required") {
+    id
+    role
+    branchId
+  }
+  suggestions(
+    where: {branchId: {eq: $branchId}}
+    orderBy: {createdAt: DESC}
+    limit: $limit
+  ) {
+    id
+    parentId
+    studentId
+    branchId
+    title
+    message
+    status
+    response
+    createdAt
+    updatedAt
+    parent {
+      id
+      fullName
+      phoneNumber
+    }
+    student {
+      id
+      fullName
+    }
+  }
+}
+
+# ─── Notification Queries ───────────────────────────────────────────────────
+
+query GetNotificationsByUser($userId: UUID!, $limit: Int = 30, $offset: Int = 0) @auth(level: USER, insecureReason: "userId is passed from authenticated session; users only fetch their own notifications") {
+  notifications(
+    where: {userId: {eq: $userId}}
+    orderBy: {createdAt: DESC}
+    limit: $limit
+    offset: $offset
+  ) {
+    id
+    title
+    message
+    audienceRole
+    category
+    academicYear
+    createdById
+    createdByRole
+    isRead
+    createdAt
+    branch {
+      id
+      name
+    }
+  }
+}
+
+query GetUnreadNotificationCount($userId: UUID!) @auth(level: USER, insecureReason: "userId is passed from authenticated session; users only count their own unread notifications") {
+  notifications(
+    where: {userId: {eq: $userId}, isRead: {eq: false}}
+  ) {
+    id
+  }
+}
+
+# ─── Broadcast Notification Helpers ─────────────────────────────────────────
+
+# Returns teacher/staff userIds in a branch for bulk notification dispatch
+query GetBranchStaffUserIds($branchId: UUID!, $limit: Int = 500) @auth(level: USER, insecureReason: "Access is gated by application-level RBAC; only authenticated branch staff invoke this for broadcast notifications") {
+  users(
+    where: {
+      _and: [
+        {branchId: {eq: $branchId}}
+        {isActive: {eq: true}}
+        {_or: [
+          {role: {eq: "TEACHER"}}
+          {role: {eq: "CLASS_TEACHER"}}
+          {role: {eq: "COORDINATOR"}}
+        ]}
+      ]
+    }
+    limit: $limit
+  ) {
+    id
+  }
+}
+
+# Returns student records with linked parent userIds for bulk notification dispatch
+query GetBranchStudentsWithParents($branchId: UUID!, $limit: Int = 1000) @auth(level: USER, insecureReason: "Access is gated by application-level RBAC; only authenticated branch staff invoke this for broadcast notifications") {
+  students(
+    where: {branchId: {eq: $branchId}, isActive: {eq: true}}
+    limit: $limit
+  ) {
+    id
+    linkedParents: studentParents_on_student {
+      userId
+    }
+  }
+}
+
+# ── Admin: Change User Primary Role ──────────────────────────────────────────
+# Used by ChangeUserRoleScreen (MAIN_ADMIN only).
+# Returns the user record including current users.role and all user_roles rows
+# so the admin can see exactly what the DB contains before making a change.
+query GetUserForRoleChange($phoneNumber: String!) @auth(level: USER) {
+  caller: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN')", message: "Main Admin only") {
+    id
+    role
+  }
+  users(where: {phoneNumber: {eq: $phoneNumber}, isActive: {eq: true}}, limit: 1) {
+    id
+    fullName
+    phoneNumber
+    role
+    branchId
+    isActive
+    branch {
+      id
+      name
+      branchCode
+    }
+    userRoles_on_user {
+      id
+      role
+      createdAt
+    }
+  }
+}
+
+# ── Academic Year queries ─────────────────────────────────────────────────────
+
+query GetAcademicYears($branchId: UUID!, $limit: Int = 20) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'PRINCIPAL' || u.role == 'COORDINATOR' || u.role == 'MAIN_ADMIN')", message: "Principal or Coordinator only") {
+    id
+    role
+  }
+  academicYears(
+    where: {branchId: {eq: $branchId}}
+    orderBy: {startYear: DESC}
+    limit: $limit
+  ) {
+    id
+    branchId
+    name
+    startYear
+    startDate
+    endDate
+    status
+    isActive
+    createdAt
+    updatedAt
+  }
+}
+
+query GetActiveAcademicYear($branchId: UUID!) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'PRINCIPAL' || u.role == 'COORDINATOR' || u.role == 'MAIN_ADMIN')", message: "Principal or Coordinator only") {
+    id
+    role
+  }
+  academicYears(
+    where: {branchId: {eq: $branchId}, isActive: {eq: true}}
+    limit: 1
+  ) {
+    id
+    branchId
+    name
+    startYear
+    startDate
+    endDate
+    status
+    isActive
+  }
+}
+
+query GetBranchPromotionHistory($branchId: UUID!, $academicYear: Int, $limit: Int = 100) @auth(level: USER) {
+  currentUser: users(
+    where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
+    limit: 1
+  ) @redact @check(expr: "this.exists(u, u.role == 'PRINCIPAL' || u.role == 'COORDINATOR' || u.role == 'MAIN_ADMIN')", message: "Principal or Coordinator only") {
+    id
+    role
+  }
+  studentPromotionHistories(
+    where: {
+      branchId: {eq: $branchId}
+      academicYear: {eq: $academicYear}
+    }
+    orderBy: {promotedAt: DESC}
+    limit: $limit
+  ) {
+    id
+    promotionStatus
+    academicYear
+    promotedAt
+    remarks
+    student {
+      id
+      fullName
+      studentId
+    }
+    fromClass {
+      id
+      name
+    }
+    toClass {
+      id
+      name
+    }
+    fromSection {
+      id
+      name
+    }
+    toSection {
+      id
+      name
+    }
+    promotedBy {
+      id
+      fullName
+    }
+  }
+}
+
+# ── Holiday Queries ──────────────────────────────────────────────────────────
+
+query GetHolidaysByBranch(
+  $branchId: UUID!
+  $fromDate: Date!
+  $toDate: Date!
+) @auth(level: USER) {
+  holidays(
+    where: {
+      branchId: {eq: $branchId}
+      date: {ge: $fromDate, le: $toDate}
+    }
+    orderBy: {date: ASC}
+  ) {
+    id
+    name
+    date
+    type
+    description
+    isPublicHoliday
+    isSeeded
+    createdById
+    createdAt
+  }
+}
+
+query GetHolidaysByMonth(
+  $branchId: UUID!
+  $fromDate: Date!
+  $toDate: Date!
+) @auth(level: USER) {
+  holidays(
+    where: {
+      branchId: {eq: $branchId}
+      date: {ge: $fromDate, le: $toDate}
+    }
+    orderBy: {date: ASC}
+  ) {
+    id
+    name
+    date
+    type
+    description
+    isPublicHoliday
+  }
+}
+
+query GetAttendanceLockStatus(
+  $sectionId: UUID!
+  $attendanceDate: Date!
+) @auth(level: USER) {
+  attendances(
+    where: {
+      sectionId: {eq: $sectionId}
+      attendanceDate: {eq: $attendanceDate}
+    }
+    limit: 1
+  ) {
+    id
+    isLocked
+    lockedAt
+  }
+}
+
+# ── Attendance Audit Log ──────────────────────────────────────────────────────
+query GetAttendanceAuditLog(
+  $attendanceId: UUID!
+) @auth(level: USER) {
+  attendanceAuditLogs(
+    where: {attendanceId: {eq: $attendanceId}}
+    orderBy: {editedAt: DESC}
+  ) {
+    id
+    attendanceId
+    studentId
+    sectionId
+    branchId
+    attendanceDate
+    editedById
+    editedByRole
+    previousStatus
+    newStatus
+    reason
+    editedAt
+    editedBy {
+      id
+      fullName
+      role
+    }
+  }
+}
+
+query GetAttendanceAuditLogByBranch(
+  $branchId: UUID!
+  $fromDate: Date!
+  $toDate: Date!
+  $limit: Int = 200
+  $offset: Int = 0
+) @auth(level: USER) {
+  attendanceAuditLogs(
+    where: {
+      branchId: {eq: $branchId}
+      attendanceDate: {ge: $fromDate, le: $toDate}
+    }
+    orderBy: {editedAt: DESC}
+    limit: $limit
+    offset: $offset
+  ) {
+    id
+    attendanceId
+    studentId
+    sectionId
+    attendanceDate
+    editedById
+    editedByRole
+    previousStatus
+    newStatus
+    reason
+    editedAt
+    editedBy {
+      id
+      fullName
+      role
+    }
+    student {
+      id
+      fullName
+      studentId
+    }
+    section {
+      id
+      name
+      academicClass {
+        id
+        name
+      }
+    }
+  }
+}
+
+query GetAttendanceAuditLogBySection(
+  $sectionId: UUID!
+  $fromDate: Date!
+  $toDate: Date!
+) @auth(level: USER) {
+  attendanceAuditLogs(
+    where: {
+      sectionId: {eq: $sectionId}
+      attendanceDate: {ge: $fromDate, le: $toDate}
+    }
+    orderBy: {editedAt: DESC}
+    limit: 500
+  ) {
+    id
+    attendanceId
+    studentId
+    attendanceDate
+    editedById
+    editedByRole
+    previousStatus
+    newStatus
+    reason
+    editedAt
+    editedBy {
+      id
+      fullName
+      role
+    }
+    student {
+      id
+      fullName
+      studentId
+    }
+  }
+}
+
+# ── Attendance Summary ────────────────────────────────────────────────────────
+query GetAttendanceSummaryByStudent(
+  $studentId: UUID!
+  $academicYearId: UUID!
+) @auth(level: USER) {
+  attendanceSummaries(
+    where: {
+      studentId: {eq: $studentId}
+      academicYearId: {eq: $academicYearId}
+    }
+    orderBy: {yearMonth: ASC}
+  ) {
+    studentId
+    branchId
+    sectionId
+    academicYearId
+    yearMonth
+    totalWorkingDays
+    effectiveDays
+    presentCount
+    absentCount
+    halfDayCount
+    lateCount
+    medicalLeaveCount
+    approvedLeaveCount
+    holidayCount
+    sundayCount
+    attendancePct
+    academicYearPct
+    lastRecalcAt
+  }
+}
+
+query GetAttendanceSummaryBySection(
+  $sectionId: UUID!
+  $yearMonth: String!
+) @auth(level: USER) {
+  attendanceSummaries(
+    where: {
+      sectionId: {eq: $sectionId}
+      yearMonth: {eq: $yearMonth}
+    }
+    orderBy: {attendancePct: ASC}
+    limit: 500
+  ) {
+    studentId
+    attendancePct
+    academicYearPct
+    presentCount
+    absentCount
+    halfDayCount
+    lateCount
+    medicalLeaveCount
+    approvedLeaveCount
+    effectiveDays
+    yearMonth
+    student {
+      id
+      fullName
+      studentId
+    }
+  }
+}
+
+query GetLowAttendanceStudents(
+  $branchId: UUID!
+  $academicYearId: UUID!
+  $thresholdPct: Float!
+  $yearMonth: String
+) @auth(level: USER) {
+  attendanceSummaries(
+    where: {
+      branchId: {eq: $branchId}
+      academicYearId: {eq: $academicYearId}
+      attendancePct: {le: $thresholdPct}
+      yearMonth: {eq: $yearMonth}
+    }
+    orderBy: {attendancePct: ASC}
+    limit: 500
+  ) {
+    studentId
+    sectionId
+    yearMonth
+    attendancePct
+    academicYearPct
+    presentCount
+    absentCount
+    effectiveDays
+    student {
+      id
+      fullName
+      studentId
+      academicClass {
+        id
+        name
+      }
+      section {
+        id
+        name
+      }
+    }
+  }
+}
+
+# ── Attendance Reports ────────────────────────────────────────────────────────
+query GetDailyAttendanceReport(
+  $branchId: UUID!
+  $attendanceDate: Date!
+) @auth(level: USER) {
+  attendances(
+    where: {
+      branchId: {eq: $branchId}
+      attendanceDate: {eq: $attendanceDate}
+    }
+    orderBy: {attendanceDate: DESC}
+    limit: 2000
+  ) {
+    id
+    studentId
+    sectionId
+    attendanceDate
+    status
+    markedById
+    editedById
+    student {
+      id
+      fullName
+      studentId
+    }
+    academicClass {
+      id
+      name
+      wing {
+        id
+        code
+        name
+      }
+    }
+    section {
+      id
+      name
+    }
+  }
+}
+
+query GetMonthlyAttendanceReport(
+  $branchId: UUID!
+  $fromDate: Date!
+  $toDate: Date!
+  $limit: Int = 5000
+  $offset: Int = 0
+) @auth(level: USER) {
+  attendances(
+    where: {
+      branchId: {eq: $branchId}
+      attendanceDate: {ge: $fromDate, le: $toDate}
+    }
+    orderBy: {attendanceDate: DESC}
+    limit: $limit
+    offset: $offset
+  ) {
+    id
+    studentId
+    sectionId
+    attendanceDate
+    status
+    academicClass {
+      id
+      name
+      wing {
+        id
+        code
+      }
+    }
+    section {
+      id
+      name
+    }
+    student {
+      id
+      fullName
+      studentId
+    }
+  }
+}
+
+query GetAttendanceAlertLog(
+  $studentId: UUID!
+  $threshold: Int!
+  $yearMonth: String
+) @auth(level: USER) {
+  attendanceAlertLogs(
+    where: {
+      studentId: {eq: $studentId}
+      threshold: {eq: $threshold}
+      yearMonth: {eq: $yearMonth}
+    }
+    orderBy: {sentAt: DESC}
+    limit: 1
+  ) {
+    id
+    studentId
+    threshold
+    yearMonth
+    currentPct
+    sentAt
+    recovered
+  }
+}
+
+# ─── Marks Management & Result Publishing System ─────────────────────────────
+
+query GetExamsByBranch(
+  $branchId: UUID!
+  $academicYearId: UUID!
+  $limit: Int!
+  $offset: Int!
+) @auth(level: USER, insecureReason: "Read-only exam schedule; branchId scopes results to the caller's branch which is passed from the app session") {
+  exams(
+    where: {
+      branchId: {eq: $branchId}
+      academicYearId: {eq: $academicYearId}
+      isActive: {eq: true}
+    }
+    orderBy: [{createdAt: DESC}]
+    limit: $limit
+    offset: $offset
+  ) {
+    id
+    name
+    examType
+    status
+    startDate
+    endDate
+    remarks
+    createdAt
+    updatedAt
+    academicYear {
+      id
+      name
+      startYear
+    }
+    examSections_on_exam {
+      id
+      sectionId
+      isPublished
+      section {
+        id
+        name
+        academicClass {
+          id
+          name
+        }
+      }
+    }
+  }
+}
+
+query GetExamDetails($examId: UUID!) @auth(level: USER, insecureReason: "Read-only exam detail; all authenticated staff and students may view exam configurations") {
+  exams(where: {id: {eq: $examId}, isActive: {eq: true}}, limit: 1) {
+    id
+    name
+    examType
+    status
+    startDate
+    endDate
+    remarks
+    branchId
+    academicYearId
+    createdAt
+    updatedAt
+    createdBy {
+      id
+      fullName
+    }
+    academicYear {
+      id
+      name
+      startYear
+    }
+    examSections_on_exam {
+      id
+      sectionId
+      academicClassId
+      isPublished
+      publishedAt
+      publishedBy {
+        id
+        fullName
+      }
+      section {
+        id
+        name
+        academicClass {
+          id
+          name
+        }
+      }
+    }
+    examSubjectConfigs_on_exam {
+      subjectName
+      maxMarks
+      passingMarks
+      academicClassId
+    }
+  }
+}
+
+query GetMarksForSection(
+  $examId: UUID!
+  $sectionId: UUID!
+) @auth(level: USER, insecureReason: "Read-only marks data; examId and sectionId scope results; access controlled in the app session by role") {
+  students(
+    where: {sectionId: {eq: $sectionId}, isActive: {eq: true}, status: {eq: "ACTIVE"}}
+    orderBy: [{rollNumber: ASC}, {fullName: ASC}]
+    limit: 200
+    offset: 0
+  ) {
+    id
+    studentId
+    fullName
+    rollNumber
+    examMarks: studentMarks_on_student(where: {examId: {eq: $examId}}) {
+      subjectName
+      marksObtained
+      isAbsent
+      updatedAt
+    }
+  }
+  examSubjectConfigs(
+    where: {examId: {eq: $examId}}
+    orderBy: [{subjectName: ASC}]
+    limit: 50
+    offset: 0
+  ) {
+    subjectName
+    maxMarks
+    passingMarks
+    academicClassId
+  }
+  examSections(
+    where: {examId: {eq: $examId}, sectionId: {eq: $sectionId}}
+    limit: 1
+  ) {
+    id
+    isPublished
+    publishedAt
+  }
+}
+
+# Parent-safe: only returns published results for a specific student.
+query GetStudentResultsForParent(
+  $studentId: UUID!
+  $academicYearId: UUID!
+) @auth(level: USER, insecureReason: "Read-only exam results; parent-student access enforced in the app session via parentService.assertParentStudentAccess") {
+  examSections(
+    where: {
+      isPublished: {eq: true}
+      section: {students_on_section: {exist: {id: {eq: $studentId}, isActive: {eq: true}}}}
+    }
+    orderBy: [{publishedAt: DESC}]
+    limit: 50
+    offset: 0
+  ) {
+    id
+    isPublished
+    publishedAt
+    exam {
+      id
+      name
+      examType
+      startDate
+      endDate
+      academicYearId
+    }
+    section {
+      id
+      name
+      academicClass {
+        id
+        name
+      }
+    }
+  }
+}
+
+query GetStudentResultDetail(
+  $examId: UUID!
+  $studentId: UUID!
+) @auth(level: USER, insecureReason: "Read-only individual student result; studentId and examId scope the result; parent-student access enforced in the app session") {
+  studentMarks(
+    where: {examId: {eq: $examId}, studentId: {eq: $studentId}}
+    orderBy: [{subjectName: ASC}]
+    limit: 50
+    offset: 0
+  ) {
+    subjectName
+    marksObtained
+    isAbsent
+    updatedAt
+    student {
+      id
+      fullName
+      studentId
+      rollNumber
+      section {
+        id
+        name
+        academicClass {
+          id
+          name
+        }
+      }
+    }
+  }
+  examSubjectConfigs(
+    where: {examId: {eq: $examId}}
+    orderBy: [{subjectName: ASC}]
+    limit: 50
+    offset: 0
+  ) {
+    subjectName
+    maxMarks
+    passingMarks
+  }
+  exams(where: {id: {eq: $examId}}, limit: 1) {
+    id
+    name
+    examType
+    startDate
+    endDate
+    branchId
+    academicYear {
+      id
+      name
+      startYear
+    }
+  }
+}
+
+query GetExamAnalytics(
+  $examId: UUID!
+  $sectionId: UUID!
+) @auth(level: USER, insecureReason: "Read-only marks analytics; examId and sectionId scope results; all staff may view their section's analytics") {
+  studentMarks(
+    where: {examId: {eq: $examId}, sectionId: {eq: $sectionId}}
+    limit: 500
+    offset: 0
+  ) {
+    studentId
+    subjectName
+    marksObtained
+    isAbsent
+  }
+  examSubjectConfigs(
+    where: {examId: {eq: $examId}}
+    orderBy: [{subjectName: ASC}]
+    limit: 50
+    offset: 0
+  ) {
+    subjectName
+    maxMarks
+    passingMarks
+  }
+  students(
+    where: {sectionId: {eq: $sectionId}, isActive: {eq: true}, status: {eq: "ACTIVE"}}
+    limit: 200
+    offset: 0
+  ) {
+    id
+    fullName
+    studentId
+    rollNumber
+  }
+}
+
+query GetPublishedExamsForSection(
+  $sectionId: UUID!
+  $academicYearId: UUID!
+) @auth(level: USER, insecureReason: "Read-only published exam schedule for a section; sectionId scoping limits visible data") {
+  examSections(
+    where: {
+      sectionId: {eq: $sectionId}
+      isPublished: {eq: true}
+      exam: {academicYearId: {eq: $academicYearId}, isActive: {eq: true}}
+    }
+    orderBy: [{publishedAt: DESC}]
+    limit: 50
+    offset: 0
+  ) {
+    id
+    isPublished
+    publishedAt
+    exam {
+      id
+      name
+      examType
+      startDate
+      endDate
+    }
+  }
+}
+
+query GetExamsBySection(
+  $sectionId: UUID!
+  $academicYearId: UUID!
+) @auth(level: USER, insecureReason: "Read-only exam list for a section; sectionId and academicYearId scope results to a specific class") {
+  examSections(
+    where: {
+      sectionId: {eq: $sectionId}
+      exam: {academicYearId: {eq: $academicYearId}, isActive: {eq: true}}
+    }
+    orderBy: [{createdAt: DESC}]
+    limit: 50
+    offset: 0
+  ) {
+    id
+    isPublished
+    publishedAt
+    exam {
+      id
+      name
+      examType
+      status
+      startDate
+      endDate
+      remarks
+      examSubjectConfigs_on_exam {
+        subjectName
+        maxMarks
+        passingMarks
+        academicClassId
+      }
+    }
+  }
+}

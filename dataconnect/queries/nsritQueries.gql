@@ -1,0 +1,3 @@
+# Canonical NSRIT query operations live in ../connectors/nsrit/queries.gql
+# This file is kept for developer discovery because the project structure
+# separates schema, queries, mutations, connectors, and generated artifacts.

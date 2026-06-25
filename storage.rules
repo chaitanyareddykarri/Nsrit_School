@@ -1,0 +1,115 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function callerUid() {
+      return request.auth.uid;
+    }
+
+    // Maximum upload size: 10 MB
+    function withinSizeLimit() {
+      return request.resource.size <= 10 * 1024 * 1024;
+    }
+
+    // Allowed image MIME types for profile photos
+    function isImage() {
+      return request.resource.contentType.matches('image/(jpeg|png|webp)');
+    }
+
+    // Allowed document MIME types for student/parent uploads
+    function isDocument() {
+      return request.resource.contentType.matches(
+        'image/(jpeg|png|webp)|application/pdf'
+      );
+    }
+
+    // H-2 fix: custom token claims set at login time via Firebase Auth custom claims.
+    // The app must call admin.auth().setCustomUserClaims(uid, { role, branchId })
+    // when a user logs in (via a Cloud Function onUserLogin trigger or at profile creation).
+
+    // Staff roles that may upload documents on behalf of students/branches.
+    function isStaff() {
+      return request.auth.token.role in [
+        'MAIN_ADMIN', 'main_admin',
+        'BRANCH_ADMIN', 'branch_admin',
+        'PRINCIPAL', 'principal',
+        'COORDINATOR', 'coordinator',
+        'TEACHER', 'teacher',
+        'CLASS_TEACHER', 'class_teacher',
+        'ACCOUNTANT', 'accountant'
+      ];
+    }
+
+    // Admin-level roles that may manage branch-wide assets.
+    function isBranchAdmin() {
+      return request.auth.token.role in [
+        'MAIN_ADMIN', 'main_admin',
+        'BRANCH_ADMIN', 'branch_admin',
+        'PRINCIPAL', 'principal'
+      ];
+    }
+
+    // Caller's branch claim matches the path segment.
+    function ownsBranch(branchId) {
+      return request.auth.token.role in ['MAIN_ADMIN', 'main_admin']
+          || request.auth.token.branchId == branchId;
+    }
+
+    // ── Profile photos ────────────────────────────────────────────────────────
+    // Path: /profilePhotos/{uid}/{filename}
+    // A user may upload/replace only their own photo.
+    // Any authenticated user can read (staff need to display photos in the app).
+    match /profilePhotos/{uid}/{fileName} {
+      allow read:  if isAuthenticated();
+      allow write: if isAuthenticated()
+                   && callerUid() == uid
+                   && isImage()
+                   && withinSizeLimit();
+    }
+
+    // ── Student documents ─────────────────────────────────────────────────────
+    // Path: /studentDocs/{branchId}/{studentId}/{filename}
+    // H-2 fix: write now requires staff role AND branch ownership.
+    // Read: any authenticated user (parent/student isolation enforced in DataConnect).
+    match /studentDocs/{branchId}/{studentId}/{fileName} {
+      allow read:  if isAuthenticated();
+      allow write: if isAuthenticated()
+                   && isStaff()
+                   && ownsBranch(branchId)
+                   && isDocument()
+                   && withinSizeLimit();
+    }
+
+    // ── Branch assets (logos, notice attachments, etc.) ───────────────────────
+    // Path: /branchAssets/{branchId}/{filename}
+    // H-2 fix: restricted to admin-level roles that own the branch.
+    // Previously any authenticated user (incl. PARENT) could overwrite school logos.
+    match /branchAssets/{branchId}/{fileName} {
+      allow read:  if isAuthenticated();
+      allow write: if isAuthenticated()
+                   && isBranchAdmin()
+                   && ownsBranch(branchId)
+                   && withinSizeLimit()
+                   && (isImage() || isDocument());
+    }
+
+    // ── Bulk import templates / exports ───────────────────────────────────────
+    // Path: /exports/{branchId}/{filename}
+    // Only authenticated users may read; writes are admin-initiated server side.
+    match /exports/{branchId}/{fileName} {
+      allow read:  if isAuthenticated() && ownsBranch(branchId);
+      allow write: if false; // written by Cloud Functions / Admin SDK only
+    }
+
+    // ── Deny everything else ─────────────────────────────────────────────────
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

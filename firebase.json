@@ -1,0 +1,27 @@
+{
+  "functions": {
+    "source": "functions"
+  },
+  "emulators": {
+    "dataconnect": {
+      "port": 9399,
+      "dataDir": "dataconnect/.dataconnect/pgliteData"
+    },
+    "functions": {
+      "port": 5001
+    },
+    "auth": {
+      "port": 9099
+    }
+  },
+  "dataconnect": {
+    "source": "dataconnect"
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  }
+}

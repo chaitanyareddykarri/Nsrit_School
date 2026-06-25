@@ -1,0 +1,13 @@
+specVersion: "v1"
+serviceId: "nsrit-school-2b749-service"
+location: "asia-south1"
+schemas:
+  - source: "./schema"
+    datasource:
+      postgresql:
+        database: "nsrit-school-2b749-2-database"
+        cloudSql:
+          instanceId: "nsrit-school-2b749-2-instance"
+          schemaValidation: "COMPATIBLE" # COMPATIBLE mode makes Postgres schema compatible with Data Connect.
+connectorDirs:
+  - "./connectors/nsrit"

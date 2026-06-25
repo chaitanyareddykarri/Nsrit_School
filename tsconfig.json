@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "commonjs",
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "jsx": "react-native",
+    "skipLibCheck": true,
+    "strict": false
+  },
+  "exclude": [
+    "node_modules",
+    "android",
+    "ios"
+  ]
+}

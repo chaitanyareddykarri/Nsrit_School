@@ -1,0 +1,11 @@
+rules_version = '2';
+// All ERP data (notices, timetable, suggestions) has been migrated to
+// Firebase DataConnect (Cloud SQL). Firestore is no longer used for ERP data.
+// Only Firebase Auth is used from the Firebase JS SDK.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

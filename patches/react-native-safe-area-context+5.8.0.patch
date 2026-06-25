@@ -1,0 +1,20 @@
+diff --git a/node_modules/react-native-safe-area-context/android/src/main/jni/CMakeLists.txt b/node_modules/react-native-safe-area-context/android/src/main/jni/CMakeLists.txt
+index 52450f0..c93366d 100644
+--- a/node_modules/react-native-safe-area-context/android/src/main/jni/CMakeLists.txt
++++ b/node_modules/react-native-safe-area-context/android/src/main/jni/CMakeLists.txt
+@@ -1,5 +1,6 @@
+ cmake_minimum_required(VERSION 3.13)
+ set(CMAKE_VERBOSE_MAKEFILE ON)
++set(CMAKE_ANDROID_STL_TYPE c++_shared)
+ 
+ set(LIB_LITERAL safeareacontext)
+ set(LIB_TARGET_NAME react_codegen_${LIB_LITERAL})
+@@ -58,6 +59,8 @@ else()
+           yoga
+   )
+ endif()
++find_library(CPP_SHARED_LIB c++_shared REQUIRED)
++target_link_libraries(${LIB_TARGET_NAME} ${CPP_SHARED_LIB})
+ 
+ target_include_directories(
+   ${CMAKE_PROJECT_NAME}

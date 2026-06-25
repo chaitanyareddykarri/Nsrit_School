@@ -1,0 +1,175 @@
+diff --git a/node_modules/react-native-mmkv/android/.gradle/8.9/checksums/checksums.lock b/node_modules/react-native-mmkv/android/.gradle/8.9/checksums/checksums.lock
+new file mode 100644
+index 0000000..d96a5c9
+Binary files /dev/null and b/node_modules/react-native-mmkv/android/.gradle/8.9/checksums/checksums.lock differ
+diff --git a/node_modules/react-native-mmkv/android/.gradle/8.9/dependencies-accessors/gc.properties b/node_modules/react-native-mmkv/android/.gradle/8.9/dependencies-accessors/gc.properties
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native-mmkv/android/.gradle/8.9/fileChanges/last-build.bin b/node_modules/react-native-mmkv/android/.gradle/8.9/fileChanges/last-build.bin
+new file mode 100644
+index 0000000..f76dd23
+Binary files /dev/null and b/node_modules/react-native-mmkv/android/.gradle/8.9/fileChanges/last-build.bin differ
+diff --git a/node_modules/react-native-mmkv/android/.gradle/8.9/fileHashes/fileHashes.lock b/node_modules/react-native-mmkv/android/.gradle/8.9/fileHashes/fileHashes.lock
+new file mode 100644
+index 0000000..c6c356f
+Binary files /dev/null and b/node_modules/react-native-mmkv/android/.gradle/8.9/fileHashes/fileHashes.lock differ
+diff --git a/node_modules/react-native-mmkv/android/.gradle/8.9/gc.properties b/node_modules/react-native-mmkv/android/.gradle/8.9/gc.properties
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native-mmkv/android/.gradle/buildOutputCleanup/buildOutputCleanup.lock b/node_modules/react-native-mmkv/android/.gradle/buildOutputCleanup/buildOutputCleanup.lock
+new file mode 100644
+index 0000000..8b40780
+Binary files /dev/null and b/node_modules/react-native-mmkv/android/.gradle/buildOutputCleanup/buildOutputCleanup.lock differ
+diff --git a/node_modules/react-native-mmkv/android/.gradle/buildOutputCleanup/cache.properties b/node_modules/react-native-mmkv/android/.gradle/buildOutputCleanup/cache.properties
+new file mode 100644
+index 0000000..2858391
+--- /dev/null
++++ b/node_modules/react-native-mmkv/android/.gradle/buildOutputCleanup/cache.properties
+@@ -0,0 +1,2 @@
++#Sun Jun 07 15:18:11 IST 2026
++gradle.version=8.9
+diff --git a/node_modules/react-native-mmkv/android/.gradle/vcs-1/gc.properties b/node_modules/react-native-mmkv/android/.gradle/vcs-1/gc.properties
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native-mmkv/android/.project b/node_modules/react-native-mmkv/android/.project
+new file mode 100644
+index 0000000..ac7df87
+--- /dev/null
++++ b/node_modules/react-native-mmkv/android/.project
+@@ -0,0 +1,28 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<projectDescription>
++	<name>react-native-mmkv</name>
++	<comment>Project react-native-mmkv created by Buildship.</comment>
++	<projects>
++	</projects>
++	<buildSpec>
++		<buildCommand>
++			<name>org.eclipse.buildship.core.gradleprojectbuilder</name>
++			<arguments>
++			</arguments>
++		</buildCommand>
++	</buildSpec>
++	<natures>
++		<nature>org.eclipse.buildship.core.gradleprojectnature</nature>
++	</natures>
++	<filteredResources>
++		<filter>
++			<id>1780670497225</id>
++			<name></name>
++			<type>30</type>
++			<matcher>
++				<id>org.eclipse.core.resources.regexFilterMatcher</id>
++				<arguments>node_modules|\.git|__CREATED_BY_JAVA_LANGUAGE_SERVER__</arguments>
++			</matcher>
++		</filter>
++	</filteredResources>
++</projectDescription>
+diff --git a/node_modules/react-native-mmkv/android/CMakeLists.txt b/node_modules/react-native-mmkv/android/CMakeLists.txt
+index 8d02c1e..739bd9a 100644
+--- a/node_modules/react-native-mmkv/android/CMakeLists.txt
++++ b/node_modules/react-native-mmkv/android/CMakeLists.txt
+@@ -44,4 +44,5 @@ target_link_libraries(
+         ${LOG_LIB}
+         mmkv::mmkv                  # <-- MMKV core
+         android                     # <-- Android core
++        c++_shared                  # <-- C++ Standard Library
+ )
+diff --git a/node_modules/react-native-mmkv/android/src/main/java/com/margelo/nitro/mmkv/NitroMmkvPackage.java b/node_modules/react-native-mmkv/android/src/main/java/com/margelo/nitro/mmkv/NitroMmkvPackage.java
+index 0d09bb1..3c28c7f 100644
+--- a/node_modules/react-native-mmkv/android/src/main/java/com/margelo/nitro/mmkv/NitroMmkvPackage.java
++++ b/node_modules/react-native-mmkv/android/src/main/java/com/margelo/nitro/mmkv/NitroMmkvPackage.java
+@@ -8,12 +8,13 @@ import com.facebook.react.bridge.NativeModule;
+ import com.facebook.react.bridge.ReactApplicationContext;
+ import com.facebook.react.module.model.ReactModuleInfoProvider;
+ import com.facebook.react.BaseReactPackage;
++import com.facebook.react.ReactPackage;
+ import com.margelo.nitro.core.HybridObject;
+ 
+ import java.util.HashMap;
+ import java.util.function.Supplier;
+ 
+-public class NitroMmkvPackage extends BaseReactPackage {
++public class NitroMmkvPackage extends BaseReactPackage implements ReactPackage {
+   @Nullable
+   @Override
+   public NativeModule getModule(String name, ReactApplicationContext reactContext) {
+diff --git a/node_modules/react-native-mmkv/lib/index.d.ts b/node_modules/react-native-mmkv/lib/index.d.ts
+index 637e3d0..498e21d 100644
+--- a/node_modules/react-native-mmkv/lib/index.d.ts
++++ b/node_modules/react-native-mmkv/lib/index.d.ts
+@@ -1,6 +1,14 @@
+-export type { MMKV } from './specs/MMKV.nitro';
+-export type { Configuration, Mode } from './specs/MMKVFactory.nitro';
+-export { createMMKV } from './createMMKV/createMMKV';
++import { MMKV as MMKVInterface } from './specs/MMKV.nitro';
++import { Configuration, Mode } from './specs/MMKVFactory.nitro';
++import { createMMKV } from './createMMKV/createMMKV';
++
++export interface MMKV extends MMKVInterface {}
++export class MMKV {
++  constructor(configuration?: Configuration);
++}
++
++export type { Configuration, Mode };
++export { createMMKV };
+ export { existsMMKV } from './existsMMKV/existsMMKV';
+ export { deleteMMKV } from './deleteMMKV/deleteMMKV';
+ export { useMMKV } from './hooks/useMMKV';
+diff --git a/node_modules/react-native-mmkv/lib/index.js b/node_modules/react-native-mmkv/lib/index.js
+index 315c604..bbad4d7 100644
+--- a/node_modules/react-native-mmkv/lib/index.js
++++ b/node_modules/react-native-mmkv/lib/index.js
+@@ -1,5 +1,18 @@
+-// The create function
+-export { createMMKV } from './createMMKV/createMMKV';
++import { createMMKV } from './createMMKV/createMMKV';
++
++export class MMKV {
++  constructor(configuration) {
++    const instance = createMMKV(configuration);
++    if (instance != null && typeof instance.delete !== 'function') {
++      instance.delete = function (key) {
++        return this.remove(key);
++      };
++    }
++    return instance;
++  }
++}
++
++export { createMMKV };
+ // Exists + Delete
+ export { existsMMKV } from './existsMMKV/existsMMKV';
+ export { deleteMMKV } from './deleteMMKV/deleteMMKV';
+diff --git a/node_modules/react-native-mmkv/src/index.ts b/node_modules/react-native-mmkv/src/index.ts
+index f059d8a..62a5a4e 100644
+--- a/node_modules/react-native-mmkv/src/index.ts
++++ b/node_modules/react-native-mmkv/src/index.ts
+@@ -1,9 +1,22 @@
+-// All types
+-export type { MMKV } from './specs/MMKV.nitro'
+-export type { Configuration, Mode } from './specs/MMKVFactory.nitro'
++import { createMMKV } from './createMMKV/createMMKV'
++import type { Configuration, Mode } from './specs/MMKVFactory.nitro'
++import type { MMKV as MMKVInterface } from './specs/MMKV.nitro'
+ 
+-// The create function
+-export { createMMKV } from './createMMKV/createMMKV'
++export interface MMKV extends MMKVInterface {}
++export class MMKV {
++  constructor(configuration?: Configuration) {
++    const instance = createMMKV(configuration)
++    if (instance != null && typeof (instance as any).delete !== 'function') {
++      ;(instance as any).delete = function (key: string) {
++        return this.remove(key)
++      }
++    }
++    return instance as any
++  }
++}
++
++export type { Configuration, Mode }
++export { createMMKV }
+ 
+ // Exists + Delete
+ export { existsMMKV } from './existsMMKV/existsMMKV'

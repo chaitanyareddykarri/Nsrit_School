@@ -1,0 +1,46 @@
+diff --git a/node_modules/react-native-nitro-modules/android/.project b/node_modules/react-native-nitro-modules/android/.project
+new file mode 100644
+index 0000000..8ce4ea4
+--- /dev/null
++++ b/node_modules/react-native-nitro-modules/android/.project
+@@ -0,0 +1,28 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<projectDescription>
++	<name>react-native-nitro-modules</name>
++	<comment>Project react-native-nitro-modules created by Buildship.</comment>
++	<projects>
++	</projects>
++	<buildSpec>
++		<buildCommand>
++			<name>org.eclipse.buildship.core.gradleprojectbuilder</name>
++			<arguments>
++			</arguments>
++		</buildCommand>
++	</buildSpec>
++	<natures>
++		<nature>org.eclipse.buildship.core.gradleprojectnature</nature>
++	</natures>
++	<filteredResources>
++		<filter>
++			<id>1780670497250</id>
++			<name></name>
++			<type>30</type>
++			<matcher>
++				<id>org.eclipse.core.resources.regexFilterMatcher</id>
++				<arguments>node_modules|\.git|__CREATED_BY_JAVA_LANGUAGE_SERVER__</arguments>
++			</matcher>
++		</filter>
++	</filteredResources>
++</projectDescription>
+diff --git a/node_modules/react-native-nitro-modules/android/CMakeLists.txt b/node_modules/react-native-nitro-modules/android/CMakeLists.txt
+index 6ae86e1..c9243d9 100644
+--- a/node_modules/react-native-nitro-modules/android/CMakeLists.txt
++++ b/node_modules/react-native-nitro-modules/android/CMakeLists.txt
+@@ -55,6 +55,7 @@ target_link_libraries(
+         android                                   # <-- Android JNI core
+         fbjni::fbjni                              # <-- Facebook C++ JNI helpers
+         ReactAndroid::jsi                         # <-- RN: JSI
++        c++_shared
+ )
+ 
+ # Link react-native (different prefab between RN 0.75 and RN 0.76)
