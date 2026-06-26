@@ -1,7 +1,7 @@
 import React from 'react';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import DashboardScreen from '../screens/branchAdmin/DashboardScreen';
-import ManageTeachersScreen from '../screens/branchAdmin/ManageTeachersScreen';
+import ManageStaffScreen from '../screens/branchAdmin/ManageStaffScreen';
 import ManageStudentsScreen from '../screens/branchAdmin/ManageStudentsScreen';
 import CreateStudentScreen from '../screens/branchAdmin/CreateStudentScreen';
 import BulkStudentUploadScreen from '../screens/branchAdmin/BulkStudentUploadScreen';
@@ -25,7 +25,7 @@ const BranchAdminNavigator = () => (
     />
     <Stack.Screen
       name="ManageTeachers"
-      component={ManageTeachersScreen}
+      component={ManageStaffScreen}
       options={{title: 'Teachers'}}
     />
     <Stack.Screen

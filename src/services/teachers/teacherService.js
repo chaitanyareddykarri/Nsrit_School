@@ -5,6 +5,7 @@ import {assertBranchAccess} from '../academics/academicAccess';
 import StaffIdService from '../staff/StaffIdService';
 import {formatE164PhoneNumber, normalizePhoneNumber} from '../../utils/phone';
 import {toISODate} from '../../utils/helpers/dateHelpers';
+import {mapDesignationToRole} from '../../utils/staffRoleMapping';
 
 const today = () => toISODate();
 
@@ -104,6 +105,7 @@ const normalizeTeacherPayload = (payload, scope) => {
     staffType: payload.staffType || STAFF_TYPES.TEACHING,
     fullName: payload.fullName?.trim(),
     designation: payload.designation?.trim(),
+    systemRole: payload.systemRole || mapDesignationToRole(payload.designation?.trim()),
   };
 };
 
@@ -458,6 +460,7 @@ export const teacherService = {
       joiningYear: staffId.joiningYear,
       branchCode: staffId.branchCode,
       serialNumber: staffId.serialNumber,
+      systemRole: normalized.systemRole,
       branchId: normalized.branchId,
     });
 
@@ -466,7 +469,7 @@ export const teacherService = {
       userId: response.user_insert?.id || response.user_insert,
       ...normalized,
       ...staffId,
-      role: USER_ROLES.TEACHER,
+      role: normalized.systemRole,
       isActive: true,
     };
   },
@@ -500,8 +503,9 @@ export const teacherService = {
       pincode: normalized.pincode || null,
       emergencyContact: normalized.emergencyContact || null,
       bloodGroup: normalized.bloodGroup || null,
-      branchId: normalized.branchId,
+      systemRole: normalized.systemRole,
       isActive: normalized.isActive ?? true,
+      branchId: normalized.branchId,
     });
 
     return {id: response.teacher_update?.id || response.teacher_update, ...normalized};

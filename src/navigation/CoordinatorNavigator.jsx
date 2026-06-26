@@ -21,7 +21,7 @@ import BulkStudentImportScreen from '../screens/students/BulkStudentImportScreen
 import StudentSearchScreen from '../screens/students/StudentSearchScreen';
 import TransferStudentScreen from '../screens/students/TransferStudentScreen';
 import TeacherManagementScreen from '../screens/teachers/TeacherManagementScreen';
-import CreateTeacherScreen from '../screens/teachers/CreateTeacherScreen';
+import CreateStaffScreen from '../screens/teachers/CreateStaffScreen';
 import EditTeacherScreen from '../screens/teachers/EditTeacherScreen';
 import TeacherDetailsScreen from '../screens/teachers/TeacherDetailsScreen';
 import TeacherProfileScreen from '../screens/teachers/TeacherProfileScreen';
@@ -119,7 +119,7 @@ const CoordinatorNavigator = () => (
     />
     <Stack.Screen
       name="CreateTeacher"
-      component={CreateTeacherScreen}
+      component={CreateStaffScreen}
       options={{headerShown: true, title: 'Create Teacher'}}
     />
     <Stack.Screen

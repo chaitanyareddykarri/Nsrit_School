@@ -1,4 +1,4 @@
-﻿import React, {useMemo, useState} from 'react';
+import React, {useMemo, useState} from 'react';
 import {FlatList, Pressable, ScrollView, StyleSheet, View} from 'react-native';
 import {Text} from 'react-native-paper';
 import Animated, {} from 'react-native-reanimated';
@@ -29,13 +29,13 @@ const getInitials = name =>
         .toUpperCase()
     : '?';
 
-const TeacherCard = ({teacher, index}) => {
-  const name = teacher.fullName || teacher.user?.fullName || 'Teacher';
-  const isActive = teacher.isActive !== false;
+const StaffCard = ({staff, index}) => {
+  const name = staff.fullName || staff.user?.fullName || 'Staff';
+  const isActive = staff.isActive !== false;
   const staffLabel =
-    STAFF_TYPE_LABELS[teacher.staffType] || teacher.staffType || 'Staff';
-  const subjects = (teacher.subjects || []).map(s => s.name).join(', ');
-  const sections = (teacher.assignments || [])
+    STAFF_TYPE_LABELS[staff.staffType] || staff.staffType || 'Staff';
+  const subjects = (staff.subjects || []).map(s => s.name).join(', ');
+  const sections = (staff.assignments || [])
     .map(
       a =>
         `${a.section?.academicClass?.name || '-'}-${a.section?.name || '-'}`,
@@ -64,10 +64,10 @@ const TeacherCard = ({teacher, index}) => {
               {name}
             </Text>
             <View style={styles.metaRow}>
-              {teacher.employeeId ? (
+              {staff.employeeId ? (
                 <View style={styles.empBadge}>
                   <Text style={styles.empBadgeText}>
-                    {teacher.employeeId}
+                    {staff.employeeId}
                   </Text>
                 </View>
               ) : null}
@@ -129,7 +129,7 @@ const TeacherCard = ({teacher, index}) => {
   );
 };
 
-const ManageTeachersScreen = () => {
+export const ManageStaffScreen = ({navigation}) => {
   const user = useSelector(state => state.auth.user);
   const scope = useMemo(() => getAccessScope(user), [user]);
   const [query, setQuery] = useState('');
@@ -356,7 +356,7 @@ const ManageTeachersScreen = () => {
           </View>
         }
         renderItem={({item, index}) => (
-          <TeacherCard teacher={item} index={Math.min(index, 15)} />
+          <StaffCard staff={item} index={Math.min(index, 15)} />
         )}
         refreshing={teachersQuery.isFetching}
         ListEmptyComponent={
@@ -508,4 +508,4 @@ const styles = StyleSheet.create({
   metaItem: {alignItems: 'center', flexDirection: 'row', gap: 5},
   metaText: {color: colors.textMuted, flex: 1, fontSize: 11, fontWeight: '500'}});
 
-export default ManageTeachersScreen;
+export default ManageStaffScreen;

@@ -467,8 +467,8 @@ mutation CreateUser(
           {isActive: {eq: true}}
           {
             _or: [
-              {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal"]}}
-              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal"]}}}}
+              {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator"]}}}}
             ]
           }
         ]
@@ -570,8 +570,8 @@ mutation AddParentRole($userId: UUID!, $branchId: UUID) @auth(level: USER) @tran
                   {branchId: {eq: $branchId}}
                   {
                     _or: [
-                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
-                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                      {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
                     ]
                   }
                 ]
@@ -668,8 +668,8 @@ mutation LinkParentUser($parentId: UUID!, $userId: UUID!, $branchId: UUID) @auth
                   {branchId: {eq: $branchId}}
                   {
                     _or: [
-                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin"]}}
-                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin"]}}}}
+                      {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin"]}}}}
                     ]
                   }
                 ]
@@ -718,8 +718,8 @@ mutation LinkStudentParent(
                   {branchId: {eq: $branchId}}
                   {
                     _or: [
-                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
-                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                      {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
                     ]
                   }
                 ]
@@ -791,8 +791,8 @@ mutation CreateParent(
                   {branchId: {eq: $branchId}}
                   {
                     _or: [
-                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
-                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                      {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
                     ]
                   }
                 ]
@@ -871,8 +871,8 @@ mutation CreateParentWithoutUser(
                   {branchId: {eq: $branchId}}
                   {
                     _or: [
-                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
-                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                      {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
                     ]
                   }
                 ]
@@ -981,8 +981,8 @@ mutation CreateStudent(
                   {branchId: {eq: $branchId}}
                   {
                     _or: [
-                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
-                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                      {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
                     ]
                   }
                 ]
@@ -1114,8 +1114,8 @@ mutation UpdateStudent(
                   {branchId: {eq: $branchId}}
                   {
                     _or: [
-                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
-                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                      {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
                     ]
                   }
                 ]
@@ -1216,8 +1216,8 @@ mutation CreateAttendance(
           {isActive: {eq: true}}
           {
             _or: [
-              {role: {in: ["MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin", "PRINCIPAL", "principal", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}
-              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin", "PRINCIPAL", "principal", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}}}
+              {role: {in: ["MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin", "PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin", "PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}}}
             ]
           }
         ]
@@ -1278,8 +1278,8 @@ mutation UpdateAttendance(
           {isActive: {eq: true}}
           {
             _or: [
-              {role: {in: ["MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin", "PRINCIPAL", "principal", "COORDINATOR", "coordinator"]}}
-              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin", "PRINCIPAL", "principal", "COORDINATOR", "coordinator"]}}}}
+              {role: {in: ["MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin", "PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "COORDINATOR", "coordinator"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin", "PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "COORDINATOR", "coordinator"]}}}}
             ]
           }
         ]
@@ -1336,8 +1336,8 @@ mutation UploadFeePayment(
           {isActive: {eq: true}}
           {
             _or: [
-              {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal", "ACCOUNTANT", "accountant"]}}
-              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal", "ACCOUNTANT", "accountant"]}}}}
+              {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "ACCOUNTANT", "accountant"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "ACCOUNTANT", "accountant"]}}}}
             ]
           }
         ]
@@ -1386,8 +1386,8 @@ mutation AssignTeacher(
                   {branchId: {eq: $branchId}}
                   {
                     _or: [
-                      {role: {in: ["PRINCIPAL", "principal"]}}
-                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal"]}}}}
+                      {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator"]}}}}
                     ]
                   }
                 ]
@@ -1450,8 +1450,8 @@ mutation CreateCoordinator(
                   {branchId: {eq: $branchId}}
                   {
                     _or: [
-                      {role: {in: ["PRINCIPAL", "principal"]}}
-                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal"]}}}}
+                      {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator"]}}}}
                     ]
                   }
                 ]
@@ -1562,6 +1562,7 @@ mutation CreateTeacher(
   $joiningYear: Int!
   $branchCode: String!
   $serialNumber: Int!
+  $systemRole: String! = "TEACHER"
   $branchId: UUID!
   $wing: String @retired
 ) @auth(level: USER) @transaction {
@@ -1583,8 +1584,8 @@ mutation CreateTeacher(
                   {branchId: {eq: $branchId}}
                   {
                     _or: [
-                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
-                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                      {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
                     ]
                   }
                 ]
@@ -1625,7 +1626,7 @@ mutation CreateTeacher(
       countryCode: $countryCode
       phoneNumber: $phoneNumber
       status: "ACTIVE"
-      role: "TEACHER"
+      role: $systemRole
       employeeId: $employeeId
       staffType: $staffType
       branch: {id: $branchId}
@@ -1636,7 +1637,7 @@ mutation CreateTeacher(
   userRole_upsert(
     data: {
       userId_expr: "response.user_insert.id"
-      role: "TEACHER"
+      role: $systemRole
     }
   )
   teacher_insert(
@@ -1702,8 +1703,8 @@ mutation AssignTeacherClassTeacher(
                   {branchId: {eq: $branchId}}
                   {
                     _or: [
-                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
-                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                      {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
                       ]
                   }
                 ]
@@ -1818,6 +1819,7 @@ mutation UpdateTeacher(
   $bloodGroup: String
   $branchId: UUID!
   $wing: String @retired
+  $systemRole: String!
   $isActive: Boolean!
 ) @auth(level: USER) @transaction {
   query @redact {
@@ -1838,8 +1840,8 @@ mutation UpdateTeacher(
                   {branchId: {eq: $branchId}}
                   {
                     _or: [
-                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
-                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                      {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
                     ]
                   }
                 ]
@@ -1877,6 +1879,7 @@ mutation UpdateTeacher(
       fullName: $fullName
       countryCode: $countryCode
       phoneNumber: $phoneNumber
+      role: $systemRole
       isActive: $isActive
       updatedAt_expr: "request.time"
     }
@@ -1925,8 +1928,8 @@ mutation AssignClassTeacher($sectionId: UUID!, $teacherId: UUID!) @auth(level: U
           {isActive: {eq: true}}
           {
             _or: [
-              {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal"]}}
-              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal"]}}}}
+              {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator"]}}}}
             ]
           }
         ]
@@ -2132,8 +2135,8 @@ mutation CreateAccountant(
                   {branchId: {eq: $branchId}}
                   {
                     _or: [
-                      {role: {in: ["PRINCIPAL", "principal"]}}
-                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal"]}}}}
+                      {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator"]}}}}
                     ]
                   }
                 ]
@@ -2295,8 +2298,8 @@ mutation EnsureCoordinatorTeacherProfile(
                   {branchId: {eq: $branchId}}
                   {
                     _or: [
-                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
-                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                      {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
                       ]
                   }
                 ]
@@ -2388,8 +2391,8 @@ mutation UpdateClassTeacherAssignment(
                   {branchId: {eq: $branchId}}
                   {
                     _or: [
-                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
-                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                      {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
                       ]
                   }
                 ]
@@ -2522,8 +2525,8 @@ mutation RemoveClassTeacherAssignment(
                   {branchId: {eq: $branchId}}
                   {
                     _or: [
-                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
-                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                      {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
                       ]
                   }
                 ]
@@ -2612,8 +2615,8 @@ mutation RemoveLegacyClassTeacherAssignment(
                   {branchId: {eq: $branchId}}
                   {
                     _or: [
-                      {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
-                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                      {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
                       ]
                   }
                 ]
@@ -2706,8 +2709,8 @@ mutation UpdateAccountant(
                   {branchId: {eq: $branchId}}
                   {
                     _or: [
-                      {role: {in: ["PRINCIPAL", "principal"]}}
-                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal"]}}}}
+                      {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator"]}}}}
                     ]
                   }
                 ]
@@ -3254,8 +3257,8 @@ mutation RecordPayment(
                   {branchId: {eq: $branchId}}
                   {
                     _or: [
-                      {role: {in: ["PRINCIPAL", "principal", "ACCOUNTANT", "accountant"]}}
-                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "ACCOUNTANT", "accountant"]}}}}
+                      {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "ACCOUNTANT", "accountant"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "ACCOUNTANT", "accountant"]}}}}
                     ]
                   }
                 ]
@@ -3340,8 +3343,8 @@ mutation UpdatePayment(
                   {branchId: {eq: $branchId}}
                   {
                     _or: [
-                      {role: {in: ["PRINCIPAL", "principal", "ACCOUNTANT", "accountant"]}}
-                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "ACCOUNTANT", "accountant"]}}}}
+                      {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "ACCOUNTANT", "accountant"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "ACCOUNTANT", "accountant"]}}}}
                     ]
                   }
                 ]
@@ -3411,8 +3414,8 @@ mutation ReversePayment(
                   {branchId: {eq: $branchId}}
                   {
                     _or: [
-                      {role: {in: ["PRINCIPAL", "principal", "ACCOUNTANT", "accountant"]}}
-                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "ACCOUNTANT", "accountant"]}}}}
+                      {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "ACCOUNTANT", "accountant"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "ACCOUNTANT", "accountant"]}}}}
                     ]
                   }
                 ]

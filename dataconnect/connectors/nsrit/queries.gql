@@ -154,7 +154,7 @@ query GetStudentsByBranch($branchId: UUID!, $limit: Int = 50, $offset: Int = 0) 
   currentUser: users(
     where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
     limit: 1
-  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin' || (u.branchId == vars.branchId && (u.role == 'PRINCIPAL' || u.role == 'principal' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin' || u.role == 'COORDINATOR' || u.role == 'coordinator' || u.role == 'ACCOUNTANT' || u.role == 'accountant')))", message: "Branch leadership role required") {
+  ) @redact @check(expr: "this.exists(u, u.role == 'MAIN_ADMIN' || u.role == 'main_admin' || (u.branchId == vars.branchId && (u.role == 'PRINCIPAL' || u.role == 'COMPUTER_OPERATOR' || u.role == 'computer_operator' || u.role == 'principal' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin' || u.role == 'COORDINATOR' || u.role == 'coordinator' || u.role == 'ACCOUNTANT' || u.role == 'accountant')))", message: "Branch leadership role required") {
     id
     role
     branchId
@@ -203,8 +203,8 @@ query GetStudentsBySection($sectionId: UUID!, $limit: Int = 50, $offset: Int = 0
             # Class teacher of this section (Section.classTeacher → User reverse relation)
             {sections_on_classTeacher: {exist: {id: {eq: $sectionId}, isActive: {eq: true}}}}
             # Branch-level leadership (PRINCIPAL, BRANCH_ADMIN, COORDINATOR, ACCOUNTANT)
-            {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "ACCOUNTANT", "accountant"]}}
-            {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "ACCOUNTANT", "accountant"]}}}}
+            {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "ACCOUNTANT", "accountant"]}}
+            {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "ACCOUNTANT", "accountant"]}}}}
           ]
         }
       ]
@@ -682,7 +682,7 @@ query GetParentByPhone($branchId: UUID!, $phoneNumber: String!) @auth(level: USE
   currentUser: users(
     where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
     limit: 1
-  ) @redact @check(expr: "this.exists(u, ((u.role == 'PRINCIPAL' || u.role == 'principal' || u.role == 'COORDINATOR' || u.role == 'coordinator') && u.branchId == vars.branchId) || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Parent lookup access required") {
+  ) @redact @check(expr: "this.exists(u, ((u.role == 'PRINCIPAL' || u.role == 'COMPUTER_OPERATOR' || u.role == 'computer_operator' || u.role == 'principal' || u.role == 'COORDINATOR' || u.role == 'coordinator') && u.branchId == vars.branchId) || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Parent lookup access required") {
     id
     role
     branchId
@@ -1787,8 +1787,8 @@ query GetAttendanceBySection($sectionId: UUID!, $attendanceDate: Date!) @auth(le
         {isActive: {eq: true}}
         {
           _or: [
-            {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}
-            {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}}}
+            {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}
+            {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}}}
           ]
         }
       ]
@@ -1826,8 +1826,8 @@ query GetAttendanceBySectionHistory(
         {isActive: {eq: true}}
         {
           _or: [
-            {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}
-            {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}}}
+            {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}
+            {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}}}
           ]
         }
       ]
@@ -1900,8 +1900,8 @@ query GetAttendanceByBranch(
                 {branchId: {eq: $branchId}}
                 {
                   _or: [
-                    {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}
-                    {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}}}
+                    {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}
+                    {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}}}
                   ]
                 }
               ]
@@ -1985,8 +1985,8 @@ query GetAttendanceByWing(
                 {branchId: {eq: $branchId}}
                 {
                   _or: [
-                    {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin"]}}
-                    {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin"]}}}}
+                    {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin"]}}
+                    {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin"]}}}}
                   ]
                 }
               ]
@@ -2304,8 +2304,8 @@ query GetCoordinators($branchId: UUID!) @auth(level: USER) {
                 {branchId: {eq: $branchId}}
                 {
                   _or: [
-                    {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
-                    {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                    {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                    {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
                     ]
                 }
               ]
@@ -2362,7 +2362,7 @@ query GetCoordinatorDetails($coordinatorId: UUID!) @auth(level: USER) {
   currentUser: users(
     where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
     limit: 1
-  ) @redact @check(expr: "this.exists(u, u.role == 'PRINCIPAL' || u.role == 'principal' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin' || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Coordinator details require branch leadership") {
+  ) @redact @check(expr: "this.exists(u, u.role == 'PRINCIPAL' || u.role == 'COMPUTER_OPERATOR' || u.role == 'computer_operator' || u.role == 'principal' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin' || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Coordinator details require branch leadership") {
     id
     role
   }
@@ -2408,7 +2408,7 @@ query GetCoordinatorByUser($userId: UUID!) @auth(level: USER) {
   currentUser: users(
     where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
     limit: 1
-  ) @redact @check(expr: "this.exists(u, u.id == vars.userId || u.role == 'PRINCIPAL' || u.role == 'principal' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin' || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Coordinator profile access denied") {
+  ) @redact @check(expr: "this.exists(u, u.id == vars.userId || u.role == 'PRINCIPAL' || u.role == 'COMPUTER_OPERATOR' || u.role == 'computer_operator' || u.role == 'principal' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin' || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Coordinator profile access denied") {
     id
     role
   }
@@ -2571,7 +2571,7 @@ query GetPrincipalDashboard($branchId: UUID!) @auth(level: USER) {
   currentUser: users(
     where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
     limit: 1
-  ) @redact @check(expr: "this.exists(u, (u.role == 'PRINCIPAL' || u.role == 'principal') && u.branchId == vars.branchId)", message: "Principal branch access required") {
+  ) @redact @check(expr: "this.exists(u, (u.role == 'PRINCIPAL' || u.role == 'COMPUTER_OPERATOR' || u.role == 'computer_operator' || u.role == 'principal') && u.branchId == vars.branchId)", message: "Principal branch access required") {
     id
     role
     branchId
@@ -2606,7 +2606,7 @@ query GetStudentsByWing($branchId: UUID!, $wing: String!, $limit: Int = 50, $off
   currentUser: users(
     where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
     limit: 1
-  ) @redact @check(expr: "this.exists(u, ((u.role == 'COORDINATOR' || u.role == 'coordinator') && u.branchId == vars.branchId) || ((u.role == 'PRINCIPAL' || u.role == 'principal' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin') && u.branchId == vars.branchId) || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Branch access required") {
+  ) @redact @check(expr: "this.exists(u, ((u.role == 'COORDINATOR' || u.role == 'coordinator') && u.branchId == vars.branchId) || ((u.role == 'PRINCIPAL' || u.role == 'COMPUTER_OPERATOR' || u.role == 'computer_operator' || u.role == 'principal' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin') && u.branchId == vars.branchId) || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Branch access required") {
     id
     role
     branchId
@@ -2793,8 +2793,8 @@ query GetTeachers($branchId: UUID!, $limit: Int = 50, $offset: Int = 0) @auth(le
                 {branchId: {eq: $branchId}}
                 {
                   _or: [
-                    {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
-                    {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
+                    {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+                    {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}}}
                     ]
                 }
               ]
@@ -2870,7 +2870,7 @@ query GetTeachersByBranch($branchId: UUID!) @auth(level: USER) {
   currentUser: users(
     where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
     limit: 1
-  ) @redact @check(expr: "this.exists(u, ((u.role == 'PRINCIPAL' || u.role == 'principal' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin') && u.branchId == vars.branchId) || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Branch access required") {
+  ) @redact @check(expr: "this.exists(u, ((u.role == 'PRINCIPAL' || u.role == 'COMPUTER_OPERATOR' || u.role == 'computer_operator' || u.role == 'principal' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin') && u.branchId == vars.branchId) || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Branch access required") {
     id
     role
     branchId
@@ -2890,7 +2890,7 @@ query GetTeachersByWing($branchId: UUID!, $wing: String!, $limit: Int = 50, $off
   currentUser: users(
     where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
     limit: 1
-  ) @redact @check(expr: "this.exists(u, ((u.role == 'COORDINATOR' || u.role == 'coordinator' || u.role == 'PRINCIPAL' || u.role == 'principal' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin') && u.branchId == vars.branchId) || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Branch access required") {
+  ) @redact @check(expr: "this.exists(u, ((u.role == 'COORDINATOR' || u.role == 'coordinator' || u.role == 'PRINCIPAL' || u.role == 'COMPUTER_OPERATOR' || u.role == 'computer_operator' || u.role == 'principal' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin') && u.branchId == vars.branchId) || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Branch access required") {
     id
     role
     branchId
@@ -3102,7 +3102,7 @@ query GetTeacherProfileByUser($userId: UUID!) @auth(level: USER) {
           _or: [
             {id: {eq: $userId}}
             {role: {in: ["MAIN_ADMIN", "main_admin"]}}
-            {role: {in: ["PRINCIPAL", "principal", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
+            {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator"]}}
             ]
         }
       ]
@@ -3279,7 +3279,7 @@ query GetAccountants($branchId: UUID!, $limit: Int = 50, $offset: Int = 0) @auth
   currentUser: users(
     where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
     limit: 1
-  ) @redact @check(expr: "this.exists(u, ((u.role == 'PRINCIPAL' || u.role == 'principal' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin') && u.branchId == vars.branchId) || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Accountant management access required") {
+  ) @redact @check(expr: "this.exists(u, ((u.role == 'PRINCIPAL' || u.role == 'COMPUTER_OPERATOR' || u.role == 'computer_operator' || u.role == 'principal' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin') && u.branchId == vars.branchId) || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Accountant management access required") {
     id
     role
     branchId
@@ -3318,7 +3318,7 @@ query GetAccountantProfile($accountantId: UUID!) @auth(level: USER) {
   currentUser: users(
     where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
     limit: 1
-  ) @redact @check(expr: "this.exists(u, u.role == 'PRINCIPAL' || u.role == 'principal' || u.role == 'ACCOUNTANT' || u.role == 'accountant' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin' || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Accountant profile access required") {
+  ) @redact @check(expr: "this.exists(u, u.role == 'PRINCIPAL' || u.role == 'COMPUTER_OPERATOR' || u.role == 'computer_operator' || u.role == 'principal' || u.role == 'ACCOUNTANT' || u.role == 'accountant' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin' || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Accountant profile access required") {
     id
     role
     branchId
@@ -3363,7 +3363,7 @@ query GetAccountantByUser($userId: UUID!) @auth(level: USER) {
   currentUser: users(
     where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
     limit: 1
-  ) @redact @check(expr: "this.exists(u, u.id == vars.userId || u.role == 'PRINCIPAL' || u.role == 'principal' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin' || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Accountant profile access denied") {
+  ) @redact @check(expr: "this.exists(u, u.id == vars.userId || u.role == 'PRINCIPAL' || u.role == 'COMPUTER_OPERATOR' || u.role == 'computer_operator' || u.role == 'principal' || u.role == 'BRANCH_ADMIN' || u.role == 'branch_admin' || u.role == 'MAIN_ADMIN' || u.role == 'main_admin')", message: "Accountant profile access denied") {
     id
     role
   }
@@ -3650,8 +3650,8 @@ query GetStudentFeeProfile($studentId: UUID!, $actorRole: String, $actorRoleAlia
         {isActive: {eq: true}}
         {
           _or: [
-            {role: {in: ["MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin", "PRINCIPAL", "principal", "COORDINATOR", "coordinator", "ACCOUNTANT", "accountant", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}
-            {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin", "PRINCIPAL", "principal", "COORDINATOR", "coordinator", "ACCOUNTANT", "accountant", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}}}
+            {role: {in: ["MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin", "PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "COORDINATOR", "coordinator", "ACCOUNTANT", "accountant", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}
+            {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin", "BRANCH_ADMIN", "branch_admin", "PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "COORDINATOR", "coordinator", "ACCOUNTANT", "accountant", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}}}
           ]
         }
       ]
@@ -4726,7 +4726,7 @@ query GetSuggestionsByBranch($branchId: UUID!, $limit: Int = 100) @auth(level: U
   currentUser: users(
     where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
     limit: 1
-  ) @redact @check(expr: "this.exists(u, (u.role == 'PRINCIPAL' || u.role == 'principal' || u.role == 'MAIN_ADMIN' || u.role == 'main_admin') && (u.branchId == vars.branchId || u.role == 'MAIN_ADMIN' || u.role == 'main_admin'))", message: "Principal or Main Admin required") {
+  ) @redact @check(expr: "this.exists(u, (u.role == 'PRINCIPAL' || u.role == 'COMPUTER_OPERATOR' || u.role == 'computer_operator' || u.role == 'principal' || u.role == 'MAIN_ADMIN' || u.role == 'main_admin') && (u.branchId == vars.branchId || u.role == 'MAIN_ADMIN' || u.role == 'main_admin'))", message: "Principal or Main Admin required") {
     id
     role
     branchId
@@ -4865,7 +4865,7 @@ query GetAcademicYears($branchId: UUID!, $limit: Int = 20) @auth(level: USER) {
   currentUser: users(
     where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
     limit: 1
-  ) @redact @check(expr: "this.exists(u, u.role == 'PRINCIPAL' || u.role == 'COORDINATOR' || u.role == 'MAIN_ADMIN')", message: "Principal or Coordinator only") {
+  ) @redact @check(expr: "this.exists(u, u.role == 'PRINCIPAL' || u.role == 'COMPUTER_OPERATOR' || u.role == 'computer_operator' || u.role == 'COORDINATOR' || u.role == 'MAIN_ADMIN')", message: "Principal or Coordinator only") {
     id
     role
   }
@@ -4891,7 +4891,7 @@ query GetActiveAcademicYear($branchId: UUID!) @auth(level: USER) {
   currentUser: users(
     where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
     limit: 1
-  ) @redact @check(expr: "this.exists(u, u.role == 'PRINCIPAL' || u.role == 'COORDINATOR' || u.role == 'MAIN_ADMIN')", message: "Principal or Coordinator only") {
+  ) @redact @check(expr: "this.exists(u, u.role == 'PRINCIPAL' || u.role == 'COMPUTER_OPERATOR' || u.role == 'computer_operator' || u.role == 'COORDINATOR' || u.role == 'MAIN_ADMIN')", message: "Principal or Coordinator only") {
     id
     role
   }
@@ -4914,7 +4914,7 @@ query GetBranchPromotionHistory($branchId: UUID!, $academicYear: Int, $limit: In
   currentUser: users(
     where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
     limit: 1
-  ) @redact @check(expr: "this.exists(u, u.role == 'PRINCIPAL' || u.role == 'COORDINATOR' || u.role == 'MAIN_ADMIN')", message: "Principal or Coordinator only") {
+  ) @redact @check(expr: "this.exists(u, u.role == 'PRINCIPAL' || u.role == 'COMPUTER_OPERATOR' || u.role == 'computer_operator' || u.role == 'COORDINATOR' || u.role == 'MAIN_ADMIN')", message: "Principal or Coordinator only") {
     id
     role
   }

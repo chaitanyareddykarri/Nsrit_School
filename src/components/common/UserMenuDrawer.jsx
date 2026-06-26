@@ -26,6 +26,7 @@ const ROLE_CONFIG = {
   MAIN_ADMIN: {color: colors.primaryDark, icon: 'shield-crown-outline'},
   BRANCH_ADMIN: {color: colors.secondary, icon: 'office-building-outline'},
   PRINCIPAL: {color: colors.primary, icon: 'school-outline'},
+  COMPUTER_OPERATOR: {color: colors.primary, icon: 'desktop-mac'},
   COORDINATOR: {color: colors.info, icon: 'account-supervisor-outline'},
   TEACHER: {color: colors.secondary, icon: 'teach'},
   CLASS_TEACHER: {color: colors.secondary, icon: 'account-school-outline'},

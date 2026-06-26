@@ -154,10 +154,18 @@ const normalizeProfile = (profile, fallback = {}) => {
 };
 
 const fetchUserProfile = async firebaseUID => {
-  const response = await dataConnectClient.query(DATA_CONNECT_QUERIES.GET_CURRENT_USER, {
-    firebaseUID,
-  });
-  return response.users?.[0] || null;
+  try {
+    const response = await dataConnectClient.query(DATA_CONNECT_QUERIES.GET_CURRENT_USER, {
+      firebaseUID,
+    });
+    return response.users?.[0] || null;
+  } catch (error) {
+    if (error.message?.includes('PERMISSION_DENIED') || error.message?.includes('aborted')) {
+      logger.log('[Auth] fetchUserProfile caught PERMISSION_DENIED (new user), returning null');
+      return null;
+    }
+    throw error;
+  }
 };
 
 const fetchUserProfileByPhone = async phoneNumber => {

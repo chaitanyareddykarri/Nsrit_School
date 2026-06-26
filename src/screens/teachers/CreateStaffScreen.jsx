@@ -1,4 +1,4 @@
-﻿import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {Pressable, ScrollView, StyleSheet, TextInput, View} from 'react-native';
 import {Text} from 'react-native-paper';
 import Animated, {} from 'react-native-reanimated';
@@ -11,6 +11,7 @@ import teacherService from '../../services/teachers/teacherService';
 import {getAccessScope} from '../../services/rbacScope';
 import {toISODate} from '../../utils/helpers/dateHelpers';
 import {colors, radius, shadows, spacing} from '../../theme';
+import {mapDesignationToRole, SUPPORTING_STAFF_DESIGNATIONS, TEACHING_STAFF_DESIGNATIONS} from '../../utils/staffRoleMapping';
 
 const genderOptions = ['Female', 'Male', 'Other'].map(value => ({label: value, value}));
 const staffTypeOptions = [
@@ -18,10 +19,13 @@ const staffTypeOptions = [
   {label: STAFF_TYPE_LABELS[STAFF_TYPES.SUPPORTING], value: STAFF_TYPES.SUPPORTING},
 ];
 
+const supportingDesignations = SUPPORTING_STAFF_DESIGNATIONS.map(d => ({label: d, value: d}));
+const teachingDesignations = TEACHING_STAFF_DESIGNATIONS.map(d => ({label: d, value: d}));
+
 const initialForm = {
   fullName: '', phoneNumber: '', alternateMobileNumber: '', email: '', gender: '',
-  joiningDate: toISODate(new Date()), designation: '', staffType: STAFF_TYPES.TEACHING,
-  dateOfBirth: '', qualification: '', experience: '', address: '', city: '',
+  joiningDate: toISODate(new Date()), designation: 'Teacher', staffType: STAFF_TYPES.TEACHING,
+  systemRole: 'TEACHER', dateOfBirth: '', qualification: '', experience: '', address: '', city: '',
   state: '', pincode: '', emergencyContact: '', bloodGroup: '', countryCode: '+91'};
 
 const InputRow = ({icon, label, ...props}) => (
@@ -31,7 +35,7 @@ const InputRow = ({icon, label, ...props}) => (
   </View>
 );
 
-const CreateTeacherScreen = ({navigation}) => {
+const CreateStaffScreen = ({navigation}) => {
   const queryClient = useQueryClient();
   const user = useSelector(state => state.auth.user);
   const scope = getAccessScope(user);
@@ -40,13 +44,35 @@ const CreateTeacherScreen = ({navigation}) => {
   const [confirmVisible, setConfirmVisible] = useState(false);
   const updateField = (field, value) => setForm(current => ({...current, [field]: value}));
 
+  useEffect(() => {
+    // When staff type changes, update designation to default for that type
+    if (form.staffType === STAFF_TYPES.TEACHING && !TEACHING_STAFF_DESIGNATIONS.includes(form.designation)) {
+      updateField('designation', 'Teacher');
+    } else if (form.staffType === STAFF_TYPES.SUPPORTING && !SUPPORTING_STAFF_DESIGNATIONS.includes(form.designation)) {
+      updateField('designation', 'Office Assistant');
+    }
+  }, [form.staffType]);
+
+  useEffect(() => {
+    // Auto-assign system role based on designation
+    const mappedRole = mapDesignationToRole(form.designation);
+    if (mappedRole !== form.systemRole) {
+      updateField('systemRole', mappedRole);
+    }
+  }, [form.designation]);
+
   const mutation = useMutation({
+    // We send the new systemRole to teacherService, which passes it to the mutation
     mutationFn: payload => teacherService.createTeacher(payload, scope),
     onSuccess: teacher => {
       queryClient.invalidateQueries({queryKey: ['teachers', user?.branchId]});
       navigation.replace('TeacherDetails', {teacherId: teacher.id});
     },
     onError: err => setError(err.message)});
+
+  const designationOptions = form.staffType === STAFF_TYPES.SUPPORTING 
+    ? supportingDesignations 
+    : teachingDesignations;
 
   return (
     <ScrollView
@@ -57,8 +83,8 @@ const CreateTeacherScreen = ({navigation}) => {
 
       <Animated.View style={styles.hero}>
         <View style={styles.heroDecor} />
-        <Text style={styles.heroOverline}>Teachers</Text>
-        <Text style={styles.heroTitle}>Create Teacher</Text>
+        <Text style={styles.heroOverline}>Staff Management</Text>
+        <Text style={styles.heroTitle}>Create Staff</Text>
         <Text style={styles.heroSub}>Branch is inherited automatically</Text>
       </Animated.View>
 
@@ -72,9 +98,15 @@ const CreateTeacherScreen = ({navigation}) => {
         <View style={styles.selectWrap}>
           <DatePickerField label="Joining Date" value={form.joiningDate} maximumDate={toISODate(new Date())} required onChange={v => updateField('joiningDate', v)} />
         </View>
-        <InputRow icon="briefcase-outline" label="Designation *" value={form.designation} onChangeText={v => updateField('designation', v)} />
         <View style={styles.selectWrap}>
           <SelectField label="Staff Type *" value={form.staffType} options={staffTypeOptions} onChange={v => updateField('staffType', v)} />
+        </View>
+        <View style={styles.selectWrap}>
+          <SelectField label="Designation *" value={form.designation} options={designationOptions} onChange={v => updateField('designation', v)} />
+        </View>
+        <View style={styles.systemRoleWrap}>
+          <MaterialCommunityIcons name="shield-check-outline" size={14} color={colors.primary} />
+          <Text style={styles.systemRoleText}>Auto-Assigned Role: <Text style={{fontWeight: '700'}}>{form.systemRole}</Text></Text>
         </View>
       </Animated.View>
 
@@ -115,14 +147,14 @@ const CreateTeacherScreen = ({navigation}) => {
           pressed && form.fullName && form.phoneNumber && {opacity: 0.88},
         ]}>
         <MaterialCommunityIcons name="account-plus-outline" size={18} color={colors.white} />
-        <Text style={styles.submitBtnText}>{mutation.isPending ? 'Creating…' : 'Create Teacher'}</Text>
+        <Text style={styles.submitBtnText}>{mutation.isPending ? 'Creating...' : 'Create Staff'}</Text>
       </Pressable>
 
       <View style={{height: spacing.xxxl}} />
       <ConfirmationModal
         visible={confirmVisible}
-        title="Create Teacher?"
-        message={`Create teacher account for ${form.fullName || 'this user'}?`}
+        title="Create Staff?"
+        message={`Create staff account for ${form.fullName || 'this user'}? They will be assigned the system role: ${form.systemRole}.`}
         confirmLabel="Yes, Create"
         cancelLabel="Cancel"
         onConfirm={() => {
@@ -183,6 +215,15 @@ const styles = StyleSheet.create({
   inputIcon: {marginRight: spacing.sm},
   input: {color: colors.text, flex: 1, fontSize: 14, fontWeight: '500', minHeight: 46},
   selectWrap: {borderTopColor: colors.border, borderTopWidth: 1, padding: spacing.sm},
+  systemRoleWrap: {
+    alignItems: 'center',
+    backgroundColor: colors.primarySoft,
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    padding: spacing.md},
+  systemRoleText: {color: colors.primary, fontSize: 12, fontWeight: '500'},
   errorBox: {
     alignItems: 'center',
     backgroundColor: colors.dangerSoft,
@@ -203,4 +244,4 @@ const styles = StyleSheet.create({
     ...shadows.fab},
   submitBtnText: {color: colors.white, fontSize: 14, fontWeight: '700'}});
 
-export default CreateTeacherScreen;
+export default CreateStaffScreen;

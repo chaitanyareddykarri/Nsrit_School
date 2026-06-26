@@ -43,7 +43,7 @@ import AccountantProfileScreen from '../screens/principal/AccountantProfileScree
 import PromotionManagementScreen from '../screens/principal/PromotionManagementScreen';
 import PromotionHistoryScreen from '../screens/principal/PromotionHistoryScreen';
 import TeacherManagementScreen from '../screens/teachers/TeacherManagementScreen';
-import CreateTeacherScreen from '../screens/teachers/CreateTeacherScreen';
+import CreateStaffScreen from '../screens/teachers/CreateStaffScreen';
 import EditTeacherScreen from '../screens/teachers/EditTeacherScreen';
 import TeacherDetailsScreen from '../screens/teachers/TeacherDetailsScreen';
 import TeacherProfileScreen from '../screens/teachers/TeacherProfileScreen';
@@ -279,7 +279,7 @@ const MainAdminNavigator = () => (
     />
     <Stack.Screen
       name="CreateTeacher"
-      component={CreateTeacherScreen}
+      component={CreateStaffScreen}
       options={{headerShown: true, title: 'Create Teacher'}}
     />
     <Stack.Screen

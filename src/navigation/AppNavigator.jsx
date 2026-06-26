@@ -12,6 +12,7 @@ import CoordinatorNavigator from './CoordinatorNavigator';
 import MainAdminNavigator from './MainAdminNavigator';
 import ParentNavigator from './ParentNavigator';
 import PrincipalNavigator from './PrincipalNavigator';
+import ComputerOperatorNavigator from './ComputerOperatorNavigator';
 import TeacherNavigator from './TeacherNavigator';
 import {ensureMasterClassesForBranch} from '../services/academics/SeedMasterClasses';
 
@@ -23,6 +24,8 @@ const getRoleNavigator = role => {
       return <BranchAdminNavigator />;
     case USER_ROLES.PRINCIPAL:
       return <PrincipalNavigator />;
+    case USER_ROLES.COMPUTER_OPERATOR:
+      return <ComputerOperatorNavigator />;
     case USER_ROLES.COORDINATOR:
       return <CoordinatorNavigator />;
     case USER_ROLES.TEACHER:
