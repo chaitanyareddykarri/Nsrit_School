@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">NSRITSchoolApp</string>
+    <string name="default_notification_channel_id">nsrit_alerts</string>
 </resources>

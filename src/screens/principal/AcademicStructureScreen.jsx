@@ -86,10 +86,11 @@ const AcademicHeader = React.memo(({count, navigation}) => (
 const AcademicStructureScreen = ({navigation}) => {
   const dispatch = useDispatch();
   const {items, loading} = useSelector(state => state.classes);
+  const user = useSelector(state => state.auth.user);
 
   useEffect(() => {
-    dispatch(fetchClasses());
-  }, [dispatch]);
+    dispatch(fetchClasses(user?.branchId));
+  }, [dispatch, user?.branchId]);
 
   if (loading && items.length === 0) {
     return (

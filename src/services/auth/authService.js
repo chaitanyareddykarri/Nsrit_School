@@ -289,6 +289,7 @@ const hydrateRoleProfile = async (profile, preferredRole) => {
   const parent = await parentService.getParentByUser(profile.id);
   return {
     ...baseProfile,
+    branchId: parent?.branchId || baseProfile.branchId || null,
     parentId: profile.id,
     parentProfileId: parent?.id || null,
   };

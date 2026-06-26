@@ -130,10 +130,13 @@ const ClassWiseFeeReportScreen = ({navigation, route}) => {
 
   // Filter classes based on coordinator wing if applicable
   const coordinatorClasses = useMemo(() => {
+    const branchFiltered = access.branchId
+      ? classes.filter(cls => cls.branchId === access.branchId)
+      : classes;
     if (access.role === 'COORDINATOR' || access.role === 'coordinator') {
-      return classes.filter(cls => cls.wing?.code === access.wing);
+      return branchFiltered.filter(cls => cls.wing?.code === access.wing);
     }
-    return classes;
+    return branchFiltered;
   }, [classes, access]);
 
   const classOptions = useMemo(() => {

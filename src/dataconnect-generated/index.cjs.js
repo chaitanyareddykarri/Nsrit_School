@@ -1273,6 +1273,20 @@ exports.upsertExamSubjectConfig = function upsertExamSubjectConfig(dcOrVars, var
 }
 ;
 
+const deleteExamSubjectConfigRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'DeleteExamSubjectConfig', inputVars);
+}
+deleteExamSubjectConfigRef.operationName = 'DeleteExamSubjectConfig';
+exports.deleteExamSubjectConfigRef = deleteExamSubjectConfigRef;
+
+exports.deleteExamSubjectConfig = function deleteExamSubjectConfig(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(deleteExamSubjectConfigRef(dcInstance, inputVars));
+}
+;
+
 const upsertStudentMarkRef = (dcOrVars, vars) => {
   const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
   dcInstance._useGeneratedSdk();
@@ -1312,6 +1326,20 @@ exports.unpublishExamSectionRef = unpublishExamSectionRef;
 exports.unpublishExamSection = function unpublishExamSection(dcOrVars, vars) {
   const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
   return executeMutation(unpublishExamSectionRef(dcInstance, inputVars));
+}
+;
+
+const updateFcmTokenRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'UpdateFcmToken', inputVars);
+}
+updateFcmTokenRef.operationName = 'UpdateFcmToken';
+exports.updateFcmTokenRef = updateFcmTokenRef;
+
+exports.updateFcmToken = function updateFcmToken(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(updateFcmTokenRef(dcInstance, inputVars));
 }
 ;
 
@@ -1701,6 +1729,21 @@ exports.getSectionsByClass = function getSectionsByClass(dcOrVars, varsOrOptions
   
   const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrVars, varsOrOptions, options, true, true);
   return executeQuery(getSectionsByClassRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
+}
+;
+
+const getSectionClassTeacherRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return queryRef(dcInstance, 'GetSectionClassTeacher', inputVars);
+}
+getSectionClassTeacherRef.operationName = 'GetSectionClassTeacher';
+exports.getSectionClassTeacherRef = getSectionClassTeacherRef;
+
+exports.getSectionClassTeacher = function getSectionClassTeacher(dcOrVars, varsOrOptions, options) {
+  
+  const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrVars, varsOrOptions, options, true, true);
+  return executeQuery(getSectionClassTeacherRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
 }
 ;
 

@@ -48,8 +48,12 @@ const SectionManagementScreen = ({navigation}) => {
   const academicYear = academicYearService.getCurrentStartYear(user?.branchId);
 
   const classesQuery = useQuery({
-    queryKey: ['activeAcademicClasses'],
+    queryKey: ['activeAcademicClasses', user?.branchId],
     queryFn: () => academicRepository.getActiveAcademicClasses()});
+  const branchClasses = useMemo(
+    () => (classesQuery.data || []).filter(c => c.branchId === user?.branchId),
+    [classesQuery.data, user?.branchId],
+  );
   const sectionsQuery = useQuery({
     queryKey: ['sections', user?.branchId, academicYear],
     queryFn: () =>
@@ -118,7 +122,7 @@ const SectionManagementScreen = ({navigation}) => {
             item={item}
             index={Math.min(index, 15)}
             studentCount={studentCounts[item.id] || 0}
-            onPress={() => navigation.navigate('SectionDetails', {section: item})}
+            onPress={() => navigation.navigate('SectionDetails', {section: item, studentCount: studentCounts[item.id] || 0})}
           />
         )}
         ListEmptyComponent={
@@ -136,7 +140,7 @@ const SectionManagementScreen = ({navigation}) => {
 
       <CreateSectionModal
         visible={modalVisible}
-        classes={classesQuery.data || []}
+        classes={branchClasses}
         existingSections={sections}
         onDismiss={() => setModalVisible(false)}
         onSubmit={payload => mutation.mutate(payload)}

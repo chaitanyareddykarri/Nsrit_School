@@ -56,7 +56,8 @@ const CreateExamScreen = ({navigation, route}) => {
           startDate: form.startDate || null,
           endDate: form.endDate || null,
           remarks: form.remarks || null,
-          createdById: user.id});
+          createdById: user.id,
+          role: user.role});
         Toast.show({type: 'success', text1: 'Exam created'});
         navigation.replace('ExamDetails', {examId: created.id});
       }

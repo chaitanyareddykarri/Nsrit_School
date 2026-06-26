@@ -462,7 +462,7 @@ const BellScheduleModal = ({visible, currentPeriods, onApply, onClose, applying}
 // ── Main Screen ───────────────────────────────────────────────────────────────
 
 const TimetableEditorScreen = ({route, navigation}) => {
-  const {sectionId, sectionName, className, branchId} = route.params || {};
+  const {sectionId, sectionName, className, branchId, studentCount} = route.params || {};
   const user = useSelector(state => state.auth.user);
   const role = useSelector(state => state.auth.role);
   const userId = user?.id;
@@ -494,9 +494,9 @@ const TimetableEditorScreen = ({route, navigation}) => {
     queryKey: ['teachersByBranch', branchId],
     queryFn: () => teacherService.getTeachers({branchId}, {role, branchId}),
     enabled: Boolean(branchId)});
-  const teachers = useMemo(() => (teachersData?.teachers || []).map(t => ({
+  const teachers = useMemo(() => (teachersData || []).map(t => ({
     id: t.id,
-    name: t.user?.name || t.name || '',
+    name: t.fullName || t.name || '',
     designation: t.designation || ''})), [teachersData]);
 
   const timetableStatus = useMemo(
@@ -699,10 +699,24 @@ const TimetableEditorScreen = ({route, navigation}) => {
               <MaterialCommunityIcons name="calendar-clock" size={20} color={colors.white} />
             </View>
             <View style={styles.headerCopy}>
-              <Text style={styles.headerTitle}>{className} — {sectionName}</Text>
-              <Text style={styles.headerSub}>
-                {filledCount}/{totalSlots} periods filled
-              </Text>
+              <Text style={styles.headerTitle}>{className} — Section {sectionName}</Text>
+              <View style={styles.headerSubRow}>
+                <Text style={styles.headerSub}>{filledCount}/{totalSlots} periods filled</Text>
+                {studentCount > 0 ? (
+                  <>
+                    <Text style={styles.headerSubDot}> · </Text>
+                    <MaterialCommunityIcons name="account-group-outline" size={11} color="rgba(255,255,255,0.65)" />
+                    <Text style={styles.headerSub}> {studentCount} students</Text>
+                  </>
+                ) : null}
+                {teachers.length > 0 ? (
+                  <>
+                    <Text style={styles.headerSubDot}> · </Text>
+                    <MaterialCommunityIcons name="account-tie-outline" size={11} color="rgba(255,255,255,0.65)" />
+                    <Text style={styles.headerSub}> {teachers.length} teachers</Text>
+                  </>
+                ) : null}
+              </View>
             </View>
             {isBusy ? <ActivityIndicator size="small" color={colors.white} /> : null}
           </View>
@@ -924,7 +938,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center'},
   headerCopy: {flex: 1},
   headerTitle: {color: colors.white, fontSize: 16, fontWeight: '800'},
-  headerSub: {color: 'rgba(255,255,255,0.65)', fontSize: 11, marginTop: 2},
+  headerSubRow: {alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', marginTop: 2},
+  headerSub: {color: 'rgba(255,255,255,0.65)', fontSize: 11},
+  headerSubDot: {color: 'rgba(255,255,255,0.4)', fontSize: 11},
 
   headerActions: {alignItems: 'center', flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap'},
   headerStatusBadge: {

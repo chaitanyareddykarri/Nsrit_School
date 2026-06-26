@@ -7,7 +7,7 @@ import {useSelector} from 'react-redux';
 import {useQuery} from '@tanstack/react-query';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {EXAM_STATUS, EXAM_TYPE_LABELS} from '../../config/constants';
-import {EmptyState} from '../../components/common/EmptyState';
+import EmptyState from '../../components/common/EmptyState';
 import {selectActiveAcademicYear} from '../../store/slices/authSlice';
 import examService, {canManageExams} from '../../services/marks/examService';
 import {colors, radius, shadows, spacing, typography} from '../../theme';
@@ -106,8 +106,8 @@ const ExamListScreen = ({navigation}) => {
             </Pressable>
           )}
           {/* Blobs */}
-          <View style={styles.blob1} />
-          <View style={styles.blob2} />
+          <View style={styles.blob1} pointerEvents="none" />
+          <View style={styles.blob2} pointerEvents="none" />
         </Animated.View>
 
         {/* Filters */}
@@ -135,8 +135,9 @@ const ExamListScreen = ({navigation}) => {
               <EmptyState
                 icon={isError ? 'alert-circle-outline' : 'clipboard-text-outline'}
                 title={isError ? 'Failed to load exams' : 'No exams yet'}
-                description={isError ? 'Pull down to retry' : canManageExams(role) ? 'Tap + to create your first exam' : 'No exams have been created yet'}
-                action={isError ? {label: 'Retry', onPress: refetch} : undefined}
+                message={isError ? 'Pull down to retry' : canManageExams(role) ? 'Tap + to create your first exam' : 'No exams have been created yet'}
+                actionLabel={isError ? 'Retry' : undefined}
+                onAction={isError ? refetch : undefined}
               />
             )
           }

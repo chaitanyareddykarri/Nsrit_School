@@ -946,6 +946,7 @@ mutation CreateStudent(
   $dateOfBirth: Date
   $photoUrl: String
   $aadhaarNumber: String
+  $apaarId: String
   $bloodGroup: String
   $branchId: UUID!
   $wingId: UUID
@@ -1038,6 +1039,7 @@ mutation CreateStudent(
       dateOfBirth: $dateOfBirth
       photoUrl: $photoUrl
       aadhaarNumber: $aadhaarNumber
+      apaarId: $apaarId
       bloodGroup: $bloodGroup
       branch: {id: $branchId}
       wing: {id: $wingId}
@@ -1080,6 +1082,7 @@ mutation UpdateStudent(
   $dateOfBirth: Date
   $photoUrl: String
   $aadhaarNumber: String
+  $apaarId: String
   $bloodGroup: String
   $academicClassId: UUID!
   $sectionId: UUID!
@@ -1095,6 +1098,8 @@ mutation UpdateStudent(
   $fatherName: String
   $motherName: String
   $parentPhoneNumber: String
+  $transferCertificateUrl: String
+  $birthCertificateUrl: String
 ) @auth(level: USER) @transaction {
   query @redact {
     users(
@@ -1157,6 +1162,7 @@ mutation UpdateStudent(
       dateOfBirth: $dateOfBirth
       photoUrl: $photoUrl
       aadhaarNumber: $aadhaarNumber
+      apaarId: $apaarId
       bloodGroup: $bloodGroup
       academicClass: {id: $academicClassId}
       section: {id: $sectionId}
@@ -1169,6 +1175,8 @@ mutation UpdateStudent(
       emergencyContact: $emergencyContact
       transportRequired: $transportRequired
       admissionDate: $admissionDate
+      transferCertificateUrl: $transferCertificateUrl
+      birthCertificateUrl: $birthCertificateUrl
       updatedAt_expr: "request.time"
     }
   )
@@ -4918,6 +4926,7 @@ mutation UpsertExamSubjectConfig(
   $subjectName: String!
   $maxMarks: Float!
   $passingMarks: Float!
+  $examDate: Date
 ) @auth(level: USER) @transaction {
   query @redact {
     users(
@@ -4947,9 +4956,42 @@ mutation UpsertExamSubjectConfig(
       subjectName: $subjectName
       maxMarks: $maxMarks
       passingMarks: $passingMarks
+      examDate: $examDate
       updatedAt_expr: "request.time"
     }
   )
+}
+
+mutation DeleteExamSubjectConfig(
+  $examId: UUID!
+  $academicClassId: UUID!
+  $subjectName: String!
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["PRINCIPAL", "principal", "COORDINATOR", "coordinator", "MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COORDINATOR", "coordinator", "MAIN_ADMIN", "main_admin"]}}}}
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Subject config delete requires Principal or Coordinator role") {
+      id
+      role
+    }
+  }
+  examSubjectConfig_delete(key: {
+    examId: $examId
+    academicClassId: $academicClassId
+    subjectName: $subjectName
+  })
 }
 
 mutation UpsertStudentMark(
@@ -5063,6 +5105,10 @@ mutation UnpublishExamSection($examSectionId: UUID!) @auth(level: USER) @transac
       updatedAt_expr: "request.time"
     }
   )
+}
+
+mutation UpdateFcmToken($userId: UUID!, $fcmToken: String) @auth(level: USER, insecureReason: "FCM token is device-specific; userId is supplied from the authenticated session and only updates the calling user's own token") {
+  user_update(id: $userId, data: {fcmToken: $fcmToken})
 }
 
 mutation RecordMarksAuditLog(

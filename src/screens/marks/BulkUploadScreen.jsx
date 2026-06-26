@@ -48,6 +48,11 @@ const BulkUploadScreen = ({navigation, route}) => {
     queryFn: () => examService.getExamDetails(examId),
     enabled: Boolean(examId)});
 
+  const {data: sectionData, isLoading: loadingSection} = useQuery({
+    queryKey: ['marks', examId, selectedSection?.sectionId],
+    queryFn: () => marksService.getMarksForSection(examId, selectedSection.sectionId),
+    enabled: Boolean(examId && selectedSection?.sectionId)});
+
   const sections = examDetails?.examSections || [];
 
   const handleDownloadTemplate = async () => {
@@ -55,9 +60,18 @@ const BulkUploadScreen = ({navigation, route}) => {
       Toast.show({type: 'error', text1: 'Please select a section first'});
       return;
     }
+    if (!sectionData) {
+      Toast.show({type: 'error', text1: 'Section data is still loading, please wait'});
+      return;
+    }
     try {
       setDownloading(true);
-      await marksService.downloadTemplate(examId, selectedSection.sectionId);
+      const sectionLabel = selectedSection.section?.name || 'section';
+      await marksService.downloadTemplate(
+        sectionData.students,
+        sectionData.subjectConfigs,
+        `marks_template_${sectionLabel}.xlsx`,
+      );
       Toast.show({type: 'success', text1: 'Template downloaded to Documents'});
     } catch (err) {
       Toast.show({type: 'error', text1: err.message});
@@ -81,11 +95,11 @@ const BulkUploadScreen = ({navigation, route}) => {
   };
 
   const handleValidate = async () => {
-    if (!file) return;
+    if (!file || !sectionData) return;
     try {
       setValidating(true);
       const rows = await marksService.parseBulkUploadFile(file.uri, file.type);
-      const result = await marksService.validateBulkMarks(rows, examDetails, selectedSection?.sectionId);
+      const result = marksService.validateBulkMarks(rows, sectionData.students, sectionData.subjectConfigs);
       setValidationResult(result);
       setStep(3);
     } catch (err) {
@@ -100,15 +114,16 @@ const BulkUploadScreen = ({navigation, route}) => {
     try {
       setSaving(true);
       const report = await marksService.bulkSaveMarks(
-        validationResult.valid.map(row => ({
-          ...row,
-          examId,
-          sectionId: selectedSection?.sectionId,
+        validationResult.valid,
+        {
           branchId: user.branchId,
           academicYearId: activeAcademicYear?.id,
+          examId,
+          sectionId: selectedSection?.sectionId,
           enteredById: user.id,
-          role})),
-        role,
+          role,
+          subjectConfigs: sectionData?.subjectConfigs || [],
+        },
       );
       Toast.show({
         type: report.failedCount > 0 ? 'error' : 'success',
@@ -179,7 +194,7 @@ const BulkUploadScreen = ({navigation, route}) => {
             <Text style={styles.cardTitle}>2 · Upload File</Text>
             <Pressable
               onPress={handleDownloadTemplate}
-              disabled={downloading}
+              disabled={downloading || loadingSection}
               style={styles.outlineBtn}>
               {downloading ? (
                 <ActivityIndicator size="small" color={colors.info} />
@@ -205,7 +220,7 @@ const BulkUploadScreen = ({navigation, route}) => {
             {file && (
               <Pressable
                 onPress={handleValidate}
-                disabled={validating}
+                disabled={validating || loadingSection}
                 style={styles.primaryBtn}>
                 {validating ? <ActivityIndicator size="small" color={colors.white} /> : null}
                 <Text style={styles.primaryBtnText}>{validating ? 'Validating…' : 'Validate & Preview'}</Text>

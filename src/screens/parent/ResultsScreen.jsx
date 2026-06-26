@@ -1,5 +1,5 @@
-﻿import React, {useState} from 'react';
-import {FlatList, Pressable, RefreshControl, StyleSheet, View} from 'react-native';
+import React, {useState} from 'react';
+import {FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View} from 'react-native';
 import {Text} from 'react-native-paper';
 import Animated, {} from 'react-native-reanimated';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -9,13 +9,14 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {EXAM_TYPE_LABELS} from '../../config/constants';
 import {selectActiveAcademicYear} from '../../store/slices/authSlice';
 import marksService, {computeGrade} from '../../services/marks/marksService';
+import academicYearService from '../../services/academicYear/academicYearService';
 import PerformanceBar from '../../components/marks/PerformanceBar';
 import VoiceAnnouncementButton from '../../components/common/VoiceAnnouncementButton';
 import {TELUGU} from '../../services/tts/teluguTemplates';
 import {colors, radius, shadows, spacing, typography} from '../../theme';
 import UserMenuDrawer from '../../components/common/UserMenuDrawer';
 
-const ResultCard = ({examSection, studentId, studentName, onPress, delay}) => {
+const ResultCard = ({examSection, studentId, studentName, onPress}) => {
   const exam = examSection?.exam;
   const teluguText = TELUGU.resultsPublished(studentName || '', exam?.name || '');
   return (
@@ -48,29 +49,43 @@ const ResultsScreen = ({navigation}) => {
   const activeAcademicYear = useSelector(selectActiveAcademicYear);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // For a parent, the linked student is in user.students (first one for now)
-  // For multi-child support the parent picks the student.
   const student = user?.student || user?.students?.[0];
   const studentId = student?.id;
-  const academicYearId = activeAcademicYear?.id;
+  const branchId = user?.branchId;
 
+  // Selected year — defaults to active year, allows switching to previous years
+  const [selectedYearId, setSelectedYearId] = useState(null);
+  const effectiveYearId = selectedYearId || activeAcademicYear?.id;
+
+  // Fetch all academic years for the year switcher
+  const yearsQuery = useQuery({
+    queryKey: ['academicYears', branchId],
+    queryFn: () => academicYearService.getAcademicYears({branchId}),
+    enabled: Boolean(branchId),
+  });
+  const allYears = (yearsQuery.data || []).sort((a, b) => b.startYear - a.startYear);
+
+  // Fetch results for the selected year
   const {data: results = [], isLoading, isError, refetch} = useQuery({
-    queryKey: ['studentResults', studentId, academicYearId],
-    queryFn: () => marksService.getStudentResults(studentId, academicYearId),
-    enabled: Boolean(studentId)});
+    queryKey: ['studentResults', studentId, effectiveYearId],
+    queryFn: () => marksService.getStudentResults(studentId, effectiveYearId),
+    enabled: Boolean(studentId && effectiveYearId),
+  });
+
+  const selectedYear = allYears.find(y => y.id === effectiveYearId) || activeAcademicYear;
 
   const renderItem = ({item, index}) => (
     <ResultCard
       examSection={item}
       studentId={studentId}
       studentName={student?.fullName || ''}
-      delay={index * 40}
       onPress={() =>
         navigation.navigate('ResultDetails', {
-          examId: item.examId,
+          examId: item.exam?.id,
           studentId,
           examSection: item,
-          examName: item.exam?.name})
+          examName: item.exam?.name,
+        })
       }
     />
   );
@@ -84,16 +99,38 @@ const ResultsScreen = ({navigation}) => {
           </Pressable>
           <View style={styles.headerCenter}>
             <Text style={styles.headerTitle}>My Results</Text>
-            <Text style={styles.headerSub}>{activeAcademicYear?.name || ''}</Text>
+            <Text style={styles.headerSub}>{selectedYear?.name || ''}</Text>
           </View>
           <View style={{width: 36}} />
-          <View style={styles.blob1} />
-          <View style={styles.blob2} />
+          <View style={styles.blob1} pointerEvents="none" />
+          <View style={styles.blob2} pointerEvents="none" />
         </Animated.View>
+
+        {/* Year switcher — shown only if more than one year exists */}
+        {allYears.length > 1 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.yearRow}>
+            {allYears.map(year => {
+              const active = year.id === effectiveYearId;
+              return (
+                <Pressable
+                  key={year.id}
+                  onPress={() => setSelectedYearId(year.id)}
+                  style={[styles.yearChip, active && styles.yearChipActive]}>
+                  <Text style={[styles.yearChipText, active && styles.yearChipTextActive]}>
+                    {year.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        )}
 
         <FlatList
           data={results}
-          keyExtractor={item => item.id}
+          keyExtractor={item => item.examSectionId || item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} />}
@@ -109,7 +146,9 @@ const ResultsScreen = ({navigation}) => {
                   {isError ? 'Failed to load results' : 'No published results yet'}
                 </Text>
                 <Text style={styles.emptyDesc}>
-                  {isError ? 'Pull down to retry' : 'Results will appear here once published by your school'}
+                  {isError
+                    ? 'Pull down to retry'
+                    : `Results for ${selectedYear?.name || 'this year'} will appear here once published by your school`}
                 </Text>
               </View>
             )
@@ -140,6 +179,25 @@ const styles = StyleSheet.create({
   headerCenter: {flex: 1, alignItems: 'center'},
   headerTitle: {...typography.subtitle, color: colors.white},
   headerSub: {...typography.caption, color: 'rgba(255,255,255,0.75)', marginTop: 2},
+
+  // Year switcher
+  yearRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  yearChip: {
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 5,
+  },
+  yearChipActive: {backgroundColor: colors.primary, borderColor: colors.primary},
+  yearChipText: {...typography.caption, color: colors.textMuted, fontWeight: '700'},
+  yearChipTextActive: {color: colors.white},
+
   list: {padding: spacing.lg, gap: spacing.sm, paddingBottom: 48},
   card: {
     ...shadows.clay,
@@ -157,6 +215,7 @@ const styles = StyleSheet.create({
   metaText: {...typography.caption, color: colors.textSoft, fontSize: 11},
   emptyState: {alignItems: 'center', gap: spacing.sm, paddingVertical: 60},
   emptyTitle: {...typography.heading, color: colors.textMuted, textAlign: 'center'},
-  emptyDesc: {...typography.caption, color: colors.textSoft, textAlign: 'center', paddingHorizontal: spacing.xl}});
+  emptyDesc: {...typography.caption, color: colors.textSoft, textAlign: 'center', paddingHorizontal: spacing.xl},
+});
 
 export default ResultsScreen;

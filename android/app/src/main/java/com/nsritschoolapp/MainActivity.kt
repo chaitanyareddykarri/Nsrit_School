@@ -1,5 +1,8 @@
 package com.nsritschoolapp
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.os.Build
 import android.os.Bundle
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
@@ -10,6 +13,14 @@ class MainActivity : ReactActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(null)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      val channel = NotificationChannel(
+        "nsrit_alerts",
+        "School Alerts",
+        NotificationManager.IMPORTANCE_HIGH,
+      ).apply { description = "Attendance, fees, and school notifications" }
+      getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
+    }
   }
 
   /**

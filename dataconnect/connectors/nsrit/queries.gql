@@ -1142,6 +1142,7 @@ query GetStudentProfile($studentId: UUID!) @auth(level: USER) {
     dateOfBirth
     photoUrl
     bloodGroup
+    apaarId
     rollNumber
     branchId
     academicClassId
@@ -1356,6 +1357,19 @@ query GetSectionsByClass($academicClassId: UUID!) @auth(level: USER) {
   }
 }
 
+# Used by examService to notify class teacher when their section is added to an exam.
+query GetSectionClassTeacher($sectionId: UUID!) @auth(level: USER, insecureReason: "Returns only classTeacherId and class name; used internally by server-side notification logic after a section is added to an exam by an authenticated PRINCIPAL or COORDINATOR.") {
+  sections(where: {id: {eq: $sectionId}}, limit: 1) {
+    id
+    name
+    classTeacherId
+    academicClass {
+      id
+      name
+    }
+  }
+}
+
 query GetTeacherAssignments($teacherId: UUID!) @auth(level: USER) {
   teacherAssignments(where: {teacherId: {eq: $teacherId}, isActive: {eq: true}}) {
     id
@@ -1464,6 +1478,7 @@ query GetStudentDetails($studentId: UUID!) @auth(level: USER) {
     dateOfBirth
     photoUrl
     aadhaarNumber
+    apaarId
     bloodGroup
     branchId
     academicClassId
@@ -1654,6 +1669,7 @@ query GetStudents(
     dateOfBirth
     photoUrl
     aadhaarNumber
+    apaarId
     bloodGroup
     branchId
     academicClassId
@@ -1809,6 +1825,11 @@ query GetAttendanceBySection($sectionId: UUID!, $attendanceDate: Date!) @auth(le
     markedById
     editedById
     remarks
+    student {
+      id
+      fullName
+      studentId
+    }
   }
 }
 
@@ -4865,7 +4886,7 @@ query GetAcademicYears($branchId: UUID!, $limit: Int = 20) @auth(level: USER) {
   currentUser: users(
     where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
     limit: 1
-  ) @redact @check(expr: "this.exists(u, u.role == 'PRINCIPAL' || u.role == 'COORDINATOR' || u.role == 'MAIN_ADMIN')", message: "Principal or Coordinator only") {
+  ) @redact @check(expr: "this.exists(u, u.role == 'PRINCIPAL' || u.role == 'COORDINATOR' || u.role == 'MAIN_ADMIN' || u.role == 'PARENT' || u.role == 'parent')", message: "School user access required") {
     id
     role
   }
@@ -5438,6 +5459,7 @@ query GetExamDetails($examId: UUID!) @auth(level: USER, insecureReason: "Read-on
       subjectName
       maxMarks
       passingMarks
+      examDate
       academicClassId
     }
   }
@@ -5473,6 +5495,7 @@ query GetMarksForSection(
     subjectName
     maxMarks
     passingMarks
+    examDate
     academicClassId
   }
   examSections(
@@ -5486,6 +5509,9 @@ query GetMarksForSection(
 }
 
 # Parent-safe: only returns published results for a specific student.
+# Filters by academicYearId so each year's results are separate.
+# Does NOT filter by isActive on section membership — historical results must
+# remain visible even after a student is promoted to a new section.
 query GetStudentResultsForParent(
   $studentId: UUID!
   $academicYearId: UUID!
@@ -5493,7 +5519,8 @@ query GetStudentResultsForParent(
   examSections(
     where: {
       isPublished: {eq: true}
-      section: {students_on_section: {exist: {id: {eq: $studentId}, isActive: {eq: true}}}}
+      exam: {academicYearId: {eq: $academicYearId}, isActive: {eq: true}}
+      section: {students_on_section: {exist: {id: {eq: $studentId}}}}
     }
     orderBy: [{publishedAt: DESC}]
     limit: 50
@@ -5559,6 +5586,7 @@ query GetStudentResultDetail(
     subjectName
     maxMarks
     passingMarks
+    examDate
   }
   exams(where: {id: {eq: $examId}}, limit: 1) {
     id
@@ -5598,6 +5626,7 @@ query GetExamAnalytics(
     subjectName
     maxMarks
     passingMarks
+    examDate
   }
   students(
     where: {sectionId: {eq: $sectionId}, isActive: {eq: true}, status: {eq: "ACTIVE"}}
@@ -5666,6 +5695,7 @@ query GetExamsBySection(
         subjectName
         maxMarks
         passingMarks
+        examDate
         academicClassId
       }
     }

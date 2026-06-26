@@ -1,15 +1,17 @@
 ﻿import React, {useEffect, useMemo, useState} from 'react';
-import {ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View} from 'react-native';
+import {ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View} from 'react-native';
 import {Text} from 'react-native-paper';
 import Animated, {} from 'react-native-reanimated';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
 import {useSelector} from 'react-redux';
+import DocumentPicker from 'react-native-document-picker';
 import {ConfirmationModal, DatePickerField, SelectField} from '../../components';
 import {USER_ROLES} from '../../config/constants';
 import academicRepository from '../../repositories/academicRepository';
 import sectionService from '../../services/sections/sectionService';
 import studentService from '../../services/students/studentService';
+import firebaseStorageService from '../../services/storage/firebaseStorageService';
 import {getAccessScope} from '../../services/rbacScope';
 import {isBeforeDate, isFutureDate, toISODate} from '../../utils/helpers/dateHelpers';
 import {isValidAadhaarFormat} from '../../utils/masking';
@@ -34,6 +36,7 @@ const EditStudentScreen = ({navigation, route}) => {
   const [form, setForm] = useState(null);
   const [error, setError] = useState('');
   const [confirmVisible, setConfirmVisible] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState(null);
   const effectiveBranchId = form?.branchId || user?.branchId;
   const effectiveScope = useMemo(
     () => ({...scope, branchId: effectiveBranchId || scope.branchId}),
@@ -71,10 +74,13 @@ const EditStudentScreen = ({navigation, route}) => {
       // Leaves the field blank so staff must deliberately re-enter it to change it.
       // The submit handler preserves the existing DB value when the field is left empty.
       aadhaarNumber: '',
+      apaarId: student.apaarId || '',
       bloodGroup: student.bloodGroup || '', address: student.address || '',
       city: student.city || '', state: student.state || '', pincode: student.pincode || '',
       emergencyContact: student.emergencyContact || '',
-      transportRequired: Boolean(student.transportRequired), countryCode: student.countryCode || '+91'});
+      transportRequired: Boolean(student.transportRequired), countryCode: student.countryCode || '+91',
+      transferCertificateUrl: student.transferCertificateUrl || '',
+      birthCertificateUrl: student.birthCertificateUrl || ''});
   }, [detailsQuery.data?.student]);
 
   const classes = useMemo(() => {
@@ -99,6 +105,33 @@ const EditStudentScreen = ({navigation, route}) => {
     onError: err => setError(err.message)});
 
   const updateField = (field, value) => setForm(current => ({...current, [field]: value}));
+
+  const pickAndUploadDocument = async (docType) => {
+    try {
+      const result = await DocumentPicker.pickSingle({
+        type: [DocumentPicker.types.pdf, DocumentPicker.types.images],
+        copyTo: 'cachesDirectory',
+      });
+      setUploadingDoc(docType);
+      const uploadFn = docType === 'tc'
+        ? firebaseStorageService.uploadTransferCertificate
+        : firebaseStorageService.uploadBirthCertificate;
+      const url = await uploadFn({
+        studentId: form.id,
+        fileUri: result.fileCopyUri || result.uri,
+        fileName: result.name || 'document',
+      });
+      const field = docType === 'tc' ? 'transferCertificateUrl' : 'birthCertificateUrl';
+      updateField(field, url);
+    } catch (err) {
+      if (!DocumentPicker.isCancel(err)) {
+        Alert.alert('Upload Failed', err.message || 'Could not upload document.');
+      }
+    } finally {
+      setUploadingDoc(null);
+    }
+  };
+
   const save = () => {
     if (isFutureDate(form.dateOfBirth)) { setError('Date of birth cannot be a future date.'); return; }
     if (isFutureDate(form.admissionDate)) { setError('Admission date cannot be a future date.'); return; }
@@ -181,6 +214,7 @@ const EditStudentScreen = ({navigation, route}) => {
         <Text style={styles.formSection}>Optional</Text>
         <InputRow icon="image-outline" label="Student Photo URL" value={form.photoUrl} onChangeText={v => updateField('photoUrl', v)} />
         <InputRow icon="card-account-details-outline" label="Aadhaar Number" keyboardType="number-pad" placeholder="Leave blank to keep existing" value={form.aadhaarNumber} onChangeText={v => updateField('aadhaarNumber', v)} />
+        <InputRow icon="card-account-details-star-outline" label="Apaar ID" keyboardType="number-pad" value={form.apaarId} onChangeText={v => updateField('apaarId', v)} />
         <InputRow icon="water-outline" label="Blood Group" value={form.bloodGroup} onChangeText={v => updateField('bloodGroup', v)} />
         <InputRow icon="phone-alert-outline" label="Emergency Contact" keyboardType="phone-pad" value={form.emergencyContact} onChangeText={v => updateField('emergencyContact', v)} />
         <View style={styles.selectWrap}>
@@ -191,6 +225,45 @@ const EditStudentScreen = ({navigation, route}) => {
             onChange={v => updateField('transportRequired', v === 'YES')}
           />
         </View>
+      </Animated.View>
+
+      <Animated.View style={styles.formCard}>
+        <Text style={styles.formSection}>Documents</Text>
+        {[
+          {key: 'tc', label: 'Transfer Certificate', field: 'transferCertificateUrl'},
+          {key: 'bc', label: 'Birth Certificate', field: 'birthCertificateUrl'},
+        ].map(doc => (
+          <View key={doc.key} style={styles.docRow}>
+            <View style={styles.docInfo}>
+              <MaterialCommunityIcons name="file-document-outline" size={14} color={colors.textMuted} />
+              <View style={styles.docText}>
+                <Text style={styles.docLabel}>{doc.label}</Text>
+                <Text style={styles.docStatus} numberOfLines={1}>
+                  {form[doc.field] ? 'Uploaded' : 'Not uploaded'}
+                </Text>
+              </View>
+            </View>
+            <Pressable
+              onPress={() => pickAndUploadDocument(doc.key)}
+              disabled={uploadingDoc !== null}
+              style={({pressed}) => [styles.uploadBtn, pressed && {opacity: 0.7}]}>
+              {uploadingDoc === doc.key ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <>
+                  <MaterialCommunityIcons
+                    name={form[doc.field] ? 'refresh' : 'upload'}
+                    size={13}
+                    color={colors.primary}
+                  />
+                  <Text style={styles.uploadBtnText}>
+                    {form[doc.field] ? 'Re-upload' : 'Upload'}
+                  </Text>
+                </>
+              )}
+            </Pressable>
+          </View>
+        ))}
       </Animated.View>
 
       <Animated.View style={styles.formCard}>
@@ -308,6 +381,27 @@ const styles = StyleSheet.create({
     height: 50,
     justifyContent: 'center',
     ...shadows.fab},
-  submitBtnText: {color: colors.white, fontSize: 14, fontWeight: '700'}});
+  submitBtnText: {color: colors.white, fontSize: 14, fontWeight: '700'},
+  docRow: {
+    alignItems: 'center',
+    borderTopColor: colors.borderLight,
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm},
+  docInfo: {alignItems: 'center', flexDirection: 'row', flex: 1, gap: spacing.sm},
+  docText: {flex: 1},
+  docLabel: {color: colors.text, fontSize: 13, fontWeight: '600'},
+  docStatus: {color: colors.textMuted, fontSize: 11, marginTop: 1},
+  uploadBtn: {
+    alignItems: 'center',
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.pill,
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6},
+  uploadBtnText: {color: colors.primary, fontSize: 12, fontWeight: '700'}});
 
 export default EditStudentScreen;

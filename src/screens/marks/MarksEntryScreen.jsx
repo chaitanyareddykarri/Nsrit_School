@@ -42,9 +42,7 @@ const MarksEntryScreen = ({navigation, route}) => {
     (data.students || []).forEach(stu => {
       mMap[stu.id] = {};
       aMap[stu.id] = {};
-      (data.marks || [])
-        .filter(m => m.studentId === stu.id)
-        .forEach(m => {
+      (stu.examMarks || []).forEach(m => {
           mMap[stu.id][m.subjectName] = m.marksObtained != null ? String(m.marksObtained) : '';
           aMap[stu.id][m.subjectName] = m.isAbsent || false;
         });
@@ -56,7 +54,7 @@ const MarksEntryScreen = ({navigation, route}) => {
 
   const subjectConfigs = useMemo(() => data?.subjectConfigs || [], [data]);
   const students = useMemo(() => data?.students || [], [data]);
-  const isPublished = data?.isPublished || false;
+  const isPublished = data?.examSection?.isPublished || false;
   const isReadOnly = isPublished || !canEnterMarks(role);
 
   const handleChange = useCallback(
@@ -85,7 +83,7 @@ const MarksEntryScreen = ({navigation, route}) => {
             marksObtained: num,
             isAbsent: false,
             enteredById: user.id,
-            role})
+          }, cfg.maxMarks, role)
           .catch(() => {});
       }, 900);
     },
@@ -109,7 +107,7 @@ const MarksEntryScreen = ({navigation, route}) => {
             marksObtained: null,
             isAbsent: newVal,
             enteredById: user.id,
-            role})
+          }, undefined, role)
           .catch(() => {});
         return updated;
       });
@@ -142,7 +140,15 @@ const MarksEntryScreen = ({navigation, route}) => {
       });
     });
     try {
-      const report = await marksService.bulkSaveMarks(batch, role);
+      const report = await marksService.bulkSaveMarks(batch, {
+        branchId: user.branchId,
+        academicYearId: activeAcademicYear?.id,
+        examId,
+        sectionId,
+        enteredById: user.id,
+        role,
+        subjectConfigs,
+      });
       if (report.failedCount > 0) {
         Toast.show({
           type: 'error',

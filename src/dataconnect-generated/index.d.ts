@@ -642,6 +642,7 @@ export interface CreateStudentVariables {
   dateOfBirth?: DateString | null;
   photoUrl?: string | null;
   aadhaarNumber?: string | null;
+  apaarId?: string | null;
   bloodGroup?: string | null;
   branchId: UUIDString;
   wingId?: UUIDString | null;
@@ -755,6 +756,16 @@ export interface DeactivateClassVariables {
 
 export interface DeleteExamData {
   exam_update?: Exam_Key | null;
+}
+
+export interface DeleteExamSubjectConfigData {
+  examSubjectConfig_delete?: ExamSubjectConfig_Key | null;
+}
+
+export interface DeleteExamSubjectConfigVariables {
+  examId: UUIDString;
+  academicClassId: UUIDString;
+  subjectName: string;
 }
 
 export interface DeleteExamVariables {
@@ -1297,6 +1308,11 @@ export interface GetAttendanceBySectionData {
     markedById: UUIDString;
     editedById?: UUIDString | null;
     remarks?: string | null;
+    student: {
+      id: UUIDString;
+      fullName: string;
+      studentId: string;
+    } & Student_Key;
   } & Attendance_Key)[];
 }
 
@@ -2614,6 +2630,7 @@ export interface GetExamAnalyticsData {
     subjectName: string;
     maxMarks: number;
     passingMarks: number;
+    examDate?: DateString | null;
   })[];
   students: ({
     id: UUIDString;
@@ -2673,6 +2690,7 @@ export interface GetExamDetailsData {
       subjectName: string;
       maxMarks: number;
       passingMarks: number;
+      examDate?: DateString | null;
       academicClassId: UUIDString;
     })[];
   } & Exam_Key)[];
@@ -2738,6 +2756,7 @@ export interface GetExamsBySectionData {
         subjectName: string;
         maxMarks: number;
         passingMarks: number;
+        examDate?: DateString | null;
         academicClassId: UUIDString;
       })[];
     } & Exam_Key;
@@ -3229,6 +3248,7 @@ export interface GetMarksForSectionData {
     subjectName: string;
     maxMarks: number;
     passingMarks: number;
+    examDate?: DateString | null;
     academicClassId: UUIDString;
   })[];
   examSections: ({
@@ -3953,6 +3973,22 @@ export interface GetReceiptSequenceVariables {
   branchCode: string;
 }
 
+export interface GetSectionClassTeacherData {
+  sections: ({
+    id: UUIDString;
+    name: string;
+    classTeacherId?: UUIDString | null;
+    academicClass: {
+      id: UUIDString;
+      name: string;
+    } & AcademicClass_Key;
+  } & Section_Key)[];
+}
+
+export interface GetSectionClassTeacherVariables {
+  sectionId: UUIDString;
+}
+
 export interface GetSectionsByClassAndYearData {
   sections: ({
     id: UUIDString;
@@ -4159,6 +4195,7 @@ export interface GetStudentDetailsData {
     dateOfBirth?: DateString | null;
     photoUrl?: string | null;
     aadhaarNumber?: string | null;
+    apaarId?: string | null;
     bloodGroup?: string | null;
     branchId: UUIDString;
     academicClassId: UUIDString;
@@ -4493,6 +4530,7 @@ export interface GetStudentProfileData {
     dateOfBirth?: DateString | null;
     photoUrl?: string | null;
     bloodGroup?: string | null;
+    apaarId?: string | null;
     rollNumber?: string | null;
     branchId: UUIDString;
     academicClassId: UUIDString;
@@ -4598,6 +4636,7 @@ export interface GetStudentResultDetailData {
     subjectName: string;
     maxMarks: number;
     passingMarks: number;
+    examDate?: DateString | null;
   })[];
   exams: ({
     id: UUIDString;
@@ -4788,6 +4827,7 @@ export interface GetStudentsData {
     dateOfBirth?: DateString | null;
     photoUrl?: string | null;
     aadhaarNumber?: string | null;
+    apaarId?: string | null;
     bloodGroup?: string | null;
     branchId: UUIDString;
     academicClassId: UUIDString;
@@ -6082,6 +6122,15 @@ export interface UpdateExamVariables {
   remarks?: string | null;
 }
 
+export interface UpdateFcmTokenData {
+  user_update?: User_Key | null;
+}
+
+export interface UpdateFcmTokenVariables {
+  userId: UUIDString;
+  fcmToken?: string | null;
+}
+
 export interface UpdateFeeCategoryData {
   feeCategory_update?: FeeCategory_Key | null;
 }
@@ -6182,6 +6231,7 @@ export interface UpdateStudentVariables {
   dateOfBirth?: DateString | null;
   photoUrl?: string | null;
   aadhaarNumber?: string | null;
+  apaarId?: string | null;
   bloodGroup?: string | null;
   academicClassId: UUIDString;
   sectionId: UUIDString;
@@ -6197,6 +6247,8 @@ export interface UpdateStudentVariables {
   fatherName?: string | null;
   motherName?: string | null;
   parentPhoneNumber?: string | null;
+  transferCertificateUrl?: string | null;
+  birthCertificateUrl?: string | null;
 }
 
 export interface UpdateTeacherData {
@@ -6278,6 +6330,7 @@ export interface UpsertExamSubjectConfigVariables {
   subjectName: string;
   maxMarks: number;
   passingMarks: number;
+  examDate?: DateString | null;
 }
 
 export interface UpsertStudentMarkData {
@@ -7426,6 +7479,18 @@ export const upsertExamSubjectConfigRef: UpsertExamSubjectConfigRef;
 export function upsertExamSubjectConfig(vars: UpsertExamSubjectConfigVariables): MutationPromise<UpsertExamSubjectConfigData, UpsertExamSubjectConfigVariables>;
 export function upsertExamSubjectConfig(dc: DataConnect, vars: UpsertExamSubjectConfigVariables): MutationPromise<UpsertExamSubjectConfigData, UpsertExamSubjectConfigVariables>;
 
+interface DeleteExamSubjectConfigRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: DeleteExamSubjectConfigVariables): MutationRef<DeleteExamSubjectConfigData, DeleteExamSubjectConfigVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: DeleteExamSubjectConfigVariables): MutationRef<DeleteExamSubjectConfigData, DeleteExamSubjectConfigVariables>;
+  operationName: string;
+}
+export const deleteExamSubjectConfigRef: DeleteExamSubjectConfigRef;
+
+export function deleteExamSubjectConfig(vars: DeleteExamSubjectConfigVariables): MutationPromise<DeleteExamSubjectConfigData, DeleteExamSubjectConfigVariables>;
+export function deleteExamSubjectConfig(dc: DataConnect, vars: DeleteExamSubjectConfigVariables): MutationPromise<DeleteExamSubjectConfigData, DeleteExamSubjectConfigVariables>;
+
 interface UpsertStudentMarkRef {
   /* Allow users to create refs without passing in DataConnect */
   (vars: UpsertStudentMarkVariables): MutationRef<UpsertStudentMarkData, UpsertStudentMarkVariables>;
@@ -7461,6 +7526,18 @@ export const unpublishExamSectionRef: UnpublishExamSectionRef;
 
 export function unpublishExamSection(vars: UnpublishExamSectionVariables): MutationPromise<UnpublishExamSectionData, UnpublishExamSectionVariables>;
 export function unpublishExamSection(dc: DataConnect, vars: UnpublishExamSectionVariables): MutationPromise<UnpublishExamSectionData, UnpublishExamSectionVariables>;
+
+interface UpdateFcmTokenRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: UpdateFcmTokenVariables): MutationRef<UpdateFcmTokenData, UpdateFcmTokenVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: UpdateFcmTokenVariables): MutationRef<UpdateFcmTokenData, UpdateFcmTokenVariables>;
+  operationName: string;
+}
+export const updateFcmTokenRef: UpdateFcmTokenRef;
+
+export function updateFcmToken(vars: UpdateFcmTokenVariables): MutationPromise<UpdateFcmTokenData, UpdateFcmTokenVariables>;
+export function updateFcmToken(dc: DataConnect, vars: UpdateFcmTokenVariables): MutationPromise<UpdateFcmTokenData, UpdateFcmTokenVariables>;
 
 interface RecordMarksAuditLogRef {
   /* Allow users to create refs without passing in DataConnect */
@@ -7773,6 +7850,18 @@ export const getSectionsByClassRef: GetSectionsByClassRef;
 
 export function getSectionsByClass(vars: GetSectionsByClassVariables, options?: ExecuteQueryOptions): QueryPromise<GetSectionsByClassData, GetSectionsByClassVariables>;
 export function getSectionsByClass(dc: DataConnect, vars: GetSectionsByClassVariables, options?: ExecuteQueryOptions): QueryPromise<GetSectionsByClassData, GetSectionsByClassVariables>;
+
+interface GetSectionClassTeacherRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: GetSectionClassTeacherVariables): QueryRef<GetSectionClassTeacherData, GetSectionClassTeacherVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: GetSectionClassTeacherVariables): QueryRef<GetSectionClassTeacherData, GetSectionClassTeacherVariables>;
+  operationName: string;
+}
+export const getSectionClassTeacherRef: GetSectionClassTeacherRef;
+
+export function getSectionClassTeacher(vars: GetSectionClassTeacherVariables, options?: ExecuteQueryOptions): QueryPromise<GetSectionClassTeacherData, GetSectionClassTeacherVariables>;
+export function getSectionClassTeacher(dc: DataConnect, vars: GetSectionClassTeacherVariables, options?: ExecuteQueryOptions): QueryPromise<GetSectionClassTeacherData, GetSectionClassTeacherVariables>;
 
 interface GetTeacherAssignmentsRef {
   /* Allow users to create refs without passing in DataConnect */

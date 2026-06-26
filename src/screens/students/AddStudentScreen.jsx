@@ -24,7 +24,7 @@ const blankForm = {
   fatherName: '', fatherMobile: '',
   motherName: '', motherMobile: '',
   guardianName: '', guardianMobile: '',
-  photoUrl: '', aadhaarNumber: '', bloodGroup: '',
+  photoUrl: '', aadhaarNumber: '', apaarId: '', bloodGroup: '',
   address: '', city: '', state: '', pincode: '', emergencyContact: '',
   transportRequired: false, countryCode: '+91'};
 
@@ -177,6 +177,7 @@ const AddStudentScreen = ({navigation}) => {
         <Text style={styles.formSection}>Optional</Text>
         <InputRow icon="image-outline" label="Student Photo URL" value={form.photoUrl} onChangeText={v => updateField('photoUrl', v)} />
         <InputRow icon="card-account-details-outline" label="Aadhaar Number" keyboardType="number-pad" value={form.aadhaarNumber} onChangeText={v => updateField('aadhaarNumber', v)} />
+        <InputRow icon="card-account-details-star-outline" label="Apaar ID" keyboardType="number-pad" value={form.apaarId} onChangeText={v => updateField('apaarId', v)} />
         <InputRow icon="water-outline" label="Blood Group" value={form.bloodGroup} onChangeText={v => updateField('bloodGroup', v)} />
         <InputRow icon="phone-alert-outline" label="Emergency Contact" keyboardType="phone-pad" value={form.emergencyContact} onChangeText={v => updateField('emergencyContact', v)} />
         <View style={styles.selectWrap}>

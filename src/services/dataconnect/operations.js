@@ -22,6 +22,7 @@ export const DATA_CONNECT_QUERIES = {
   GET_CLASSES_BY_WING: 'GetClassesByWing',
   GET_CLASSES_BY_WING_CODE: 'GetClassesByWingCode',
   GET_SECTIONS_BY_CLASS: 'GetSectionsByClass',
+  GET_SECTION_CLASS_TEACHER: 'GetSectionClassTeacher',
   GET_TEACHER_ASSIGNMENTS: 'GetTeacherAssignments',
   SEARCH_STUDENTS: 'SearchStudents',
   GET_STUDENT_ID_SEQUENCE: 'GetStudentIdSequence',
@@ -208,6 +209,8 @@ export const DATA_CONNECT_MUTATIONS = {
   // Suggestions
   CREATE_SUGGESTION: 'CreateSuggestion',
   RESPOND_TO_SUGGESTION: 'RespondToSuggestion',
+  // FCM
+  UPDATE_FCM_TOKEN: 'UpdateFcmToken',
   // Notifications
   CREATE_NOTIFICATION: 'CreateNotification',
   MARK_NOTIFICATION_READ: 'MarkNotificationRead',
@@ -220,6 +223,7 @@ export const DATA_CONNECT_MUTATIONS = {
   DELETE_EXAM: 'DeleteExam',
   ADD_EXAM_SECTION: 'AddExamSection',
   UPSERT_EXAM_SUBJECT_CONFIG: 'UpsertExamSubjectConfig',
+  DELETE_EXAM_SUBJECT_CONFIG: 'DeleteExamSubjectConfig',
   UPSERT_STUDENT_MARK: 'UpsertStudentMark',
   PUBLISH_EXAM_SECTION: 'PublishExamSection',
   UNPUBLISH_EXAM_SECTION: 'UnpublishExamSection',
