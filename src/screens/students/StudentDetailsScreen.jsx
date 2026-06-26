@@ -1,5 +1,5 @@
 ﻿import React, {useMemo, useState} from 'react';
-import {Pressable, ScrollView, StyleSheet, View} from 'react-native';
+import {Linking, Pressable, ScrollView, StyleSheet, View} from 'react-native';
 import {Text} from 'react-native-paper';
 import Animated, {} from 'react-native-reanimated';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -266,11 +266,36 @@ const StudentDetailsScreen = ({navigation, route}) => {
           <InfoRow
             icon="card-account-details-outline"
             label="Aadhaar"
-            value={student.aadhaarDocumentUrl ? 'Document uploaded' : 'Not uploaded'}
+            value={student.aadhaarDocumentUrl ? 'Document uploaded' : 'Number not provided'}
           />
         )}
-        <InfoRow icon="file-document-outline" label="Transfer Certificate" value={student.transferCertificateUrl || 'Not uploaded'} />
-        <InfoRow icon="file-certificate-outline" label="Birth Certificate" value={student.birthCertificateUrl || 'Not uploaded'} />
+        <InfoRow
+          icon="card-account-details-star-outline"
+          label="Apaar ID"
+          value={student.apaarId || 'Not provided'}
+        />
+        {[
+          {icon: 'file-document-outline', label: 'Transfer Certificate', url: student.transferCertificateUrl},
+          {icon: 'file-certificate-outline', label: 'Birth Certificate', url: student.birthCertificateUrl},
+        ].map(doc => (
+          <View key={doc.label} style={styles.docRow}>
+            <View style={styles.docIcon}>
+              <MaterialCommunityIcons name={doc.icon} size={14} color={colors.primary} />
+            </View>
+            <View style={styles.docBody}>
+              <Text style={styles.infoLabel}>{doc.label}</Text>
+              <Text style={styles.infoValue}>{doc.url ? 'Uploaded' : 'Not uploaded'}</Text>
+            </View>
+            {doc.url ? (
+              <Pressable
+                onPress={() => Linking.openURL(doc.url)}
+                style={({pressed}) => [styles.openBtn, pressed && {opacity: 0.7}]}>
+                <MaterialCommunityIcons name="open-in-new" size={13} color={colors.primary} />
+                <Text style={styles.openBtnText}>Open</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ))}
       </SectionCard>
 
       {(data?.studentSectionHistories || []).length > 0 ? (
@@ -393,6 +418,31 @@ const styles = StyleSheet.create({
   infoLabel: {color: colors.textMuted, fontSize: 9, fontWeight: '700', textTransform: 'uppercase'},
   infoValue: {...typography.bodyBold, color: colors.text, fontSize: 12, marginTop: 1},
   infoValueRow: {alignItems: 'center', flexDirection: 'row', gap: 6},
-  infoRowEyeIcon: {opacity: 0.6}});
+  infoRowEyeIcon: {opacity: 0.6},
+  docRow: {
+    alignItems: 'center',
+    borderTopColor: colors.borderLight,
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
+    padding: spacing.sm,
+    paddingHorizontal: spacing.md},
+  docIcon: {
+    alignItems: 'center',
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.md,
+    height: 30,
+    justifyContent: 'center',
+    width: 30},
+  docBody: {flex: 1},
+  openBtn: {
+    alignItems: 'center',
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.pill,
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6},
+  openBtnText: {color: colors.primary, fontSize: 12, fontWeight: '700'}});
 
 export default StudentDetailsScreen;

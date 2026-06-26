@@ -37,7 +37,7 @@ const WingAttendanceScreen = () => {
   // ── Classes (wing-filtered) ───────────────────────────────────────────────
   const classesQuery = useQuery({
     queryKey: ['wingAttClasses', user?.branchId],
-    queryFn:  () => classService.getClasses(),
+    queryFn:  () => classService.getClasses(user?.branchId),
     enabled:  Boolean(user?.branchId)});
   const classes = useMemo(() => {
     const all = classesQuery.data || [];

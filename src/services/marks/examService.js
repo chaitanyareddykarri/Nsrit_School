@@ -37,10 +37,10 @@ export const canManageExams = role => {
   return [USER_ROLES.PRINCIPAL, USER_ROLES.COORDINATOR, USER_ROLES.MAIN_ADMIN].includes(r);
 };
 
-// Roles that can publish or unpublish results.
+// Only principals can publish results class-wise.
 export const canPublishResults = role => {
   const r = String(role || '').toUpperCase();
-  return [USER_ROLES.PRINCIPAL, USER_ROLES.COORDINATOR, USER_ROLES.MAIN_ADMIN].includes(r);
+  return [USER_ROLES.PRINCIPAL, USER_ROLES.MAIN_ADMIN].includes(r);
 };
 
 // Only principals can permanently delete or unpublish exams.
@@ -67,8 +67,8 @@ export const canEnterMarks = role => {
 };
 
 const examService = {
-  async createExam({branchId, academicYearId, name, examType, startDate, endDate, remarks, createdById}) {
-    if (!canManageExams) throw new Error('You do not have permission to create exams.');
+  async createExam({branchId, academicYearId, name, examType, startDate, endDate, remarks, createdById, role}) {
+    if (!canManageExams(role)) throw new Error('You do not have permission to create exams.');
     if (!name?.trim()) throw new Error('Exam name is required.');
     if (!examType) throw new Error('Exam type is required.');
 
@@ -145,7 +145,7 @@ const examService = {
     );
   },
 
-  async addSectionToExam(examId, sectionId, academicClassId, branchId) {
+  async addSectionToExam(examId, sectionId, academicClassId, branchId, examName, addedById) {
     const response = await dataConnectClient.mutate(DATA_CONNECT_MUTATIONS.ADD_EXAM_SECTION, {
       examId,
       sectionId,
@@ -153,10 +153,42 @@ const examService = {
       branchId,
     });
     invalidate(`exam:${examId}`, 'exams:');
+
+    // Notify the class teacher of this section so they know marks entry is needed.
+    try {
+      const sectionData = await dataConnectClient.query(DATA_CONNECT_QUERIES.GET_SECTION_CLASS_TEACHER, {sectionId});
+      const section = (sectionData.sections || [])[0];
+      const classTeacherUserId = section?.classTeacherId;
+      if (classTeacherUserId) {
+        const className = section.academicClass?.name || '';
+        const sectionName = section.name || '';
+        await dataConnectClient.mutate(DATA_CONNECT_MUTATIONS.CREATE_NOTIFICATION, {
+          userId: classTeacherUserId,
+          branchId,
+          title: 'Marks Entry Required',
+          message: `Please enter marks for "${examName || 'Exam'}" — ${className} Section ${sectionName}.`,
+          category: 'EXAM_MARKS',
+          createdById: addedById,
+          createdByRole: 'PRINCIPAL',
+        });
+      }
+    } catch {
+      // Notification failure must not block the section add.
+    }
+
     return response.examSection_insert;
   },
 
-  async upsertSubjectConfig({examId, academicClassId, branchId, subjectName, maxMarks, passingMarks}) {
+  async deleteSubjectConfig({examId, academicClassId, subjectName}) {
+    await dataConnectClient.mutate(DATA_CONNECT_MUTATIONS.DELETE_EXAM_SUBJECT_CONFIG, {
+      examId,
+      academicClassId,
+      subjectName,
+    });
+    invalidate(`exam:${examId}`);
+  },
+
+  async upsertSubjectConfig({examId, academicClassId, branchId, subjectName, maxMarks, passingMarks, examDate}) {
     if (!subjectName?.trim()) throw new Error('Subject name is required.');
     if (maxMarks <= 0) throw new Error('Maximum marks must be greater than 0.');
     if (passingMarks < 0 || passingMarks > maxMarks) {
@@ -170,6 +202,7 @@ const examService = {
       subjectName: subjectName.trim(),
       maxMarks: Number(maxMarks),
       passingMarks: Number(passingMarks),
+      examDate: examDate || null,
     });
     invalidate(`exam:${examId}`);
   },
@@ -198,6 +231,7 @@ const examService = {
         subjectName: cfg.subjectName,
         maxMarks: cfg.maxMarks,
         passingMarks: cfg.passingMarks,
+        examDate: cfg.examDate || null,
       });
     }
 
@@ -234,6 +268,7 @@ function normalizeExam(raw) {
       subjectName: c.subjectName,
       maxMarks: c.maxMarks,
       passingMarks: c.passingMarks,
+      examDate: c.examDate || null,
       academicClassId: c.academicClassId,
     })),
   };

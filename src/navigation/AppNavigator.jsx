@@ -1,4 +1,4 @@
-import React, {useEffect} from 'react';
+import React, {useEffect, useRef} from 'react';
 import {AppState} from 'react-native';
 import {NavigationContainer} from '@react-navigation/native';
 import {useDispatch, useSelector} from 'react-redux';
@@ -15,6 +15,9 @@ import PrincipalNavigator from './PrincipalNavigator';
 import ComputerOperatorNavigator from './ComputerOperatorNavigator';
 import TeacherNavigator from './TeacherNavigator';
 import {ensureMasterClassesForBranch} from '../services/academics/SeedMasterClasses';
+import fcmService from '../services/notifications/fcmService';
+import dataConnectClient from '../services/dataconnect/dataConnectClient';
+import {DATA_CONNECT_MUTATIONS} from '../services/dataconnect/operations';
 
 const getRoleNavigator = role => {
   switch (String(role || '').toUpperCase()) {
@@ -48,6 +51,34 @@ const AppNavigator = () => {
   );
 
   console.log('AppNavigator render state:', {isBootstrapping, isAuthenticated, isSelectingRole, role});
+
+  const tokenRefreshUnsub = useRef(null);
+
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) {
+      return;
+    }
+    const userId = user.id;
+    fcmService.requestPermission().then(granted => {
+      if (!granted) {return;}
+      fcmService.getToken().then(token => {
+        if (token) {
+          dataConnectClient.mutate(DATA_CONNECT_MUTATIONS.UPDATE_FCM_TOKEN, {userId, fcmToken: token})
+            .catch(e => console.log('[FCM] Token save failed:', e.message));
+        }
+      });
+      tokenRefreshUnsub.current = fcmService.onTokenRefresh(newToken => {
+        dataConnectClient.mutate(DATA_CONNECT_MUTATIONS.UPDATE_FCM_TOKEN, {userId, fcmToken: newToken})
+          .catch(e => console.log('[FCM] Token refresh save failed:', e.message));
+      });
+    });
+    return () => {
+      if (tokenRefreshUnsub.current) {
+        tokenRefreshUnsub.current();
+        tokenRefreshUnsub.current = null;
+      }
+    };
+  }, [isAuthenticated, user?.id]);
 
   useEffect(() => {
     const canSeedClasses = ['PRINCIPAL', 'BRANCH_ADMIN', 'MAIN_ADMIN'].includes(

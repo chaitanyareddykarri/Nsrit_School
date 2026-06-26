@@ -28,6 +28,7 @@ function getPdfGenerator() {
 
 export function generateReportCardHTML({student, exam, subjectRows, totalObtained, totalMax, percentage, grade, gradeLabel, branchName, academicYearName}) {
   const examDate = exam?.startDate ? formatDateForDisplay(exam.startDate) : '—';
+  const hasSubjectDates = (subjectRows || []).some(r => r.examDate);
   const className = student?.section?.academicClass?.name || '';
   const sectionName = student?.section?.name || '';
   const {grade: pGrade} = computeGrade(percentage);
@@ -38,9 +39,13 @@ export function generateReportCardHTML({student, exam, subjectRows, totalObtaine
       const statusColor = row.isAbsent ? '#F59E0B' : row.passed ? '#10B981' : '#EF4444';
       const statusLabel = row.isAbsent ? 'AB' : row.passed ? 'P' : 'F';
       const obtained = row.isAbsent ? 'AB' : row.marksObtained != null ? row.marksObtained : '—';
+      const dateTd = hasSubjectDates
+        ? `<td style="padding:8px 12px;border-bottom:1px solid #E2E8F0;text-align:center;font-size:11px;color:#64748B;">${row.examDate ? formatDateForDisplay(row.examDate) : '—'}</td>`
+        : '';
       return `
         <tr>
           <td style="padding:8px 12px;border-bottom:1px solid #E2E8F0;font-weight:600;">${row.subjectName}</td>
+          ${dateTd}
           <td style="padding:8px 12px;border-bottom:1px solid #E2E8F0;text-align:center;">${obtained}</td>
           <td style="padding:8px 12px;border-bottom:1px solid #E2E8F0;text-align:center;">${row.maxMarks}</td>
           <td style="padding:8px 12px;border-bottom:1px solid #E2E8F0;text-align:center;">${row.passingMarks}</td>
@@ -101,6 +106,7 @@ export function generateReportCardHTML({student, exam, subjectRows, totalObtaine
     <thead>
       <tr>
         <th>Subject</th>
+        ${hasSubjectDates ? '<th>Date</th>' : ''}
         <th>Marks</th>
         <th>Max</th>
         <th>Pass</th>

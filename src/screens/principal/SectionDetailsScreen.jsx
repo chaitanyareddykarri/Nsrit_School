@@ -1,8 +1,10 @@
-﻿import React from 'react';
-import {Pressable, ScrollView, StyleSheet, View} from 'react-native';
+import React, {useState} from 'react';
+import {Alert, Pressable, ScrollView, StyleSheet, View} from 'react-native';
 import {Text} from 'react-native-paper';
 import Animated, {} from 'react-native-reanimated';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import {useQueryClient} from '@tanstack/react-query';
+import sectionService from '../../services/sections/sectionService';
 import {colors, radius, shadows, spacing, typography} from '../../theme';
 import {formatDateForDisplay} from '../../utils/helpers/dateHelpers';
 
@@ -20,10 +22,38 @@ const InfoRow = ({icon, label, value}) => (
 
 const SectionDetailsScreen = ({navigation, route}) => {
   const section = route.params?.section || {};
+  const studentCount = route.params?.studentCount ?? section.studentCount ?? 0;
   const classTeacherAssignment = section.classTeacherAssignments?.[0];
   const assignmentTeacher = classTeacherAssignment?.teacher;
   const classTeacher = section.classTeacher || assignmentTeacher?.user;
   const isClassTeacherAssigned = Boolean(classTeacher?.fullName);
+  const queryClient = useQueryClient();
+  const [removing, setRemoving] = useState(false);
+
+  const handleRemove = () => {
+    Alert.alert(
+      'Remove Section',
+      `Remove ${section.academicClass?.name || 'Class'}–${section.name}? This cannot be undone.`,
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            setRemoving(true);
+            try {
+              await sectionService.removeSection(section.id);
+              queryClient.invalidateQueries({queryKey: ['sections']});
+              navigation.goBack();
+            } catch (e) {
+              setRemoving(false);
+              Alert.alert('Error', e.message || 'Failed to remove section.');
+            }
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <ScrollView
@@ -41,7 +71,7 @@ const SectionDetailsScreen = ({navigation, route}) => {
         <Text style={styles.heroSub}>Academic year {section.academicYear || '—'}</Text>
         <View style={styles.statsRow}>
           <View style={styles.stat}>
-            <Text style={styles.statValue}>{section.studentCount || 0}</Text>
+            <Text style={styles.statValue}>{studentCount}</Text>
             <Text style={styles.statLabel}>Students</Text>
           </View>
           <View style={styles.statSep} />
@@ -106,6 +136,17 @@ const SectionDetailsScreen = ({navigation, route}) => {
           {isClassTeacherAssigned ? 'Reassign Class Teacher' : 'Assign Class Teacher'}
         </Text>
       </Pressable>
+
+      {/* ── Remove section button (only when empty) ── */}
+      {studentCount === 0 ? (
+        <Pressable
+          onPress={handleRemove}
+          disabled={removing}
+          style={({pressed}) => [styles.removeBtn, (removing || pressed) && {opacity: 0.7}]}>
+          <MaterialCommunityIcons name="trash-can-outline" size={16} color={colors.danger} />
+          <Text style={styles.removeBtnText}>{removing ? 'Removing…' : 'Remove Section'}</Text>
+        </Pressable>
+      ) : null}
 
       <View style={{height: spacing.xxxl}} />
     </ScrollView>
@@ -196,6 +237,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: spacing.sm,
     ...shadows.fab},
-  assignBtnText: {color: colors.white, fontSize: 14, fontWeight: '700'}});
+  assignBtnText: {color: colors.white, fontSize: 14, fontWeight: '700'},
+
+  removeBtn: {
+    alignItems: 'center',
+    borderColor: colors.danger,
+    borderRadius: radius.card,
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    height: 48,
+    justifyContent: 'center',
+    marginTop: spacing.sm},
+  removeBtnText: {color: colors.danger, fontSize: 13, fontWeight: '700'}});
 
 export default SectionDetailsScreen;

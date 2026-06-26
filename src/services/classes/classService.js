@@ -11,9 +11,10 @@ export const classService = {
     return wingId ? classes.filter(item => item.wingId === wingId || item.wing?.code === wingId) : classes;
   },
 
-  async getClasses() {
+  async getClasses(branchId) {
     const classes = await academicRepository.getAcademicClasses();
-    return classes.length ? classes : PREDEFINED_CLASSES;
+    const filtered = branchId ? classes.filter(c => c.branchId === branchId) : classes;
+    return filtered.length ? filtered : PREDEFINED_CLASSES;
   },
 
   async createClass() {

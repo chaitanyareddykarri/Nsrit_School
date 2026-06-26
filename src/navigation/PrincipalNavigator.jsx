@@ -52,6 +52,8 @@ import ExamDetailsScreen from '../screens/marks/ExamDetailsScreen';
 import MarksEntryScreen from '../screens/marks/MarksEntryScreen';
 import BulkUploadScreen from '../screens/marks/BulkUploadScreen';
 import ExamAnalyticsScreen from '../screens/marks/ExamAnalyticsScreen';
+import AddExamSectionScreen from '../screens/marks/AddExamSectionScreen';
+import ExamSubjectConfigScreen from '../screens/marks/ExamSubjectConfigScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -287,6 +289,8 @@ const PrincipalNavigator = () => (
     <Stack.Screen name="ExamList" component={ExamListScreen} options={{headerShown: false}} />
     <Stack.Screen name="CreateExam" component={CreateExamScreen} options={{headerShown: false}} />
     <Stack.Screen name="ExamDetails" component={ExamDetailsScreen} options={{headerShown: false}} />
+    <Stack.Screen name="AddExamSection" component={AddExamSectionScreen} options={{headerShown: false}} />
+    <Stack.Screen name="ExamSubjectConfig" component={ExamSubjectConfigScreen} options={{headerShown: false}} />
     <Stack.Screen name="MarksEntry" component={MarksEntryScreen} options={{headerShown: false}} />
     <Stack.Screen name="BulkMarksUpload" component={BulkUploadScreen} options={{headerShown: false}} />
     <Stack.Screen name="ExamAnalytics" component={ExamAnalyticsScreen} options={{headerShown: false}} />

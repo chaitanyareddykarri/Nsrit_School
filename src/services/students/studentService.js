@@ -111,6 +111,7 @@ const toStudentMutationPayload = payload => ({
   dateOfBirth: payload.dateOfBirth || null,
   photoUrl: payload.photoUrl || null,
   aadhaarNumber: payload.aadhaarNumber || null,
+  apaarId: payload.apaarId || null,
   bloodGroup: payload.bloodGroup || null,
   branchId: payload.branchId,
   wingId: payload.wingId,
@@ -480,6 +481,7 @@ export const studentService = {
       dateOfBirth: normalized.dateOfBirth,
       photoUrl: normalized.photoUrl || null,
       aadhaarNumber: normalized.aadhaarNumber || null,
+      apaarId: normalized.apaarId || null,
       bloodGroup: normalized.bloodGroup || null,
       academicClassId: normalized.academicClassId,
       sectionId: normalized.sectionId,
@@ -495,6 +497,8 @@ export const studentService = {
       fatherName: normalized.fatherName,
       motherName: normalized.motherName,
       parentPhoneNumber: normalized.parentPhoneNumber,
+      transferCertificateUrl: normalized.transferCertificateUrl || null,
+      birthCertificateUrl: normalized.birthCertificateUrl || null,
     });
 
     return {id: response.student_update?.id || normalized.studentId || normalized.id, ...normalized};

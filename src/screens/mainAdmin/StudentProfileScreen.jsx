@@ -276,6 +276,15 @@ const StudentProfileScreen = ({route}) => {
         </SectionCard>
       ) : null}
 
+      {student.apaarId ? (
+        <SectionCard title="Academic IDs" delay={200}>
+          <View style={styles.docRow}>
+            <Text style={styles.infoLabel}>Apaar ID</Text>
+            <Text style={styles.infoValue}>{student.apaarId}</Text>
+          </View>
+        </SectionCard>
+      ) : null}
+
       <SectionCard title="Documents" delay={200}>
         {[
           {label: 'Aadhaar', url: student.aadhaarDocumentUrl},

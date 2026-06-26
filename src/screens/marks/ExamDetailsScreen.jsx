@@ -1,4 +1,4 @@
-﻿import React, {useState} from 'react';
+﻿import React, {useEffect, useState} from 'react';
 import {ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, View} from 'react-native';
 import {Text} from 'react-native-paper';
 import Animated, {} from 'react-native-reanimated';
@@ -68,6 +68,12 @@ const ExamDetailsScreen = ({navigation, route}) => {
     queryKey: ['exam', examId],
     queryFn: () => examService.getExamDetails(examId, true),
     enabled: Boolean(examId)});
+
+  // Refresh whenever we come back from AddExamSection or ExamSubjectConfig
+  useEffect(() => {
+    const unsub = navigation.addListener('focus', () => refetch());
+    return unsub;
+  }, [navigation, refetch]);
 
   const handlePublish = async es => {
     Alert.alert(
@@ -193,8 +199,8 @@ const ExamDetailsScreen = ({navigation, route}) => {
             </View>
           )}
         </View>
-        <View style={styles.blob1} />
-        <View style={styles.blob2} />
+        <View style={styles.blob1} pointerEvents="none" />
+        <View style={styles.blob2} pointerEvents="none" />
       </Animated.View>
 
       <ScrollView
@@ -207,8 +213,16 @@ const ExamDetailsScreen = ({navigation, route}) => {
             <Text style={styles.sectionTitle}>Subjects ({subjectCount})</Text>
             {exam.examSubjectConfigs.map((cfg, i) => (
               <View key={cfg.id} style={[styles.subjRow, i < subjectCount - 1 && styles.subjRowBorder]}>
-                <Text style={styles.subjName}>{cfg.subjectName}</Text>
-                <Text style={styles.subjMarks}>Max: {cfg.maxMarks} · Pass: {cfg.passingMarks}</Text>
+                <View style={{flex: 1}}>
+                  <Text style={styles.subjName}>{cfg.subjectName}</Text>
+                  <Text style={styles.subjMarks}>Max: {cfg.maxMarks} · Pass: {cfg.passingMarks}</Text>
+                </View>
+                {cfg.examDate && (
+                  <View style={styles.dateChip}>
+                    <MaterialCommunityIcons name="calendar-outline" size={11} color={colors.textSoft} />
+                    <Text style={styles.dateChipText}>{cfg.examDate}</Text>
+                  </View>
+                )}
               </View>
             ))}
           </Animated.View>
@@ -217,9 +231,9 @@ const ExamDetailsScreen = ({navigation, route}) => {
         {/* Add Subject Config */}
         {canManageExams(role) && (
           <Pressable
-            onPress={() => navigation.navigate('MarksEntry', {examId, exam, addSubject: true})}
+            onPress={() => navigation.navigate('ExamSubjectConfig', {examId})}
             style={({pressed}) => [styles.outlineBtn, pressed && {opacity: 0.8}]}>
-            <MaterialCommunityIcons name="plus" size={16} color={colors.primary} />
+            <MaterialCommunityIcons name="book-edit-outline" size={16} color={colors.primary} />
             <Text style={styles.outlineBtnText}>Configure Subjects & Marks</Text>
           </Pressable>
         )}
@@ -229,7 +243,16 @@ const ExamDetailsScreen = ({navigation, route}) => {
           <View style={styles.cardHeaderRow}>
             <Text style={styles.sectionTitle}>Sections ({exam.examSections?.length || 0})</Text>
             {canManageExams(role) && (
-              <Pressable onPress={() => navigation.navigate('MarksEntry', {examId, exam})} style={styles.addSectionBtn}>
+              <Pressable
+                onPress={() =>
+                  navigation.navigate('AddExamSection', {
+                    examId,
+                    branchId: exam?.branchId,
+                    existingSectionIds: (exam?.examSections || []).map(s => s.sectionId),
+                    examName: exam?.name,
+                  })
+                }
+                style={styles.addSectionBtn}>
                 <MaterialCommunityIcons name="plus" size={14} color={colors.primary} />
                 <Text style={styles.addSectionText}>Add Section</Text>
               </Pressable>
@@ -328,6 +351,8 @@ const styles = StyleSheet.create({
   subjRowBorder: {borderBottomColor: colors.borderLight, borderBottomWidth: 1},
   subjName: {...typography.body, color: colors.text, fontWeight: '600'},
   subjMarks: {...typography.caption, color: colors.textSoft, marginTop: 2},
+  dateChip: {flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: 8},
+  dateChipText: {...typography.caption, color: colors.textSoft, fontSize: 11},
   sectionRow: {
     alignItems: 'center',
     borderBottomColor: colors.borderLight,

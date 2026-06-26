@@ -66,3 +66,4 @@ export {default as LoadingScreen} from './loaders/LoadingScreen';
 // Layout
 export {default as ERPLayout} from './erp/ERPLayout';
 export {default as RoleSwitcherModal} from './common/RoleSwitcherModal';
+export {default as UserMenuDrawer} from './common/UserMenuDrawer';

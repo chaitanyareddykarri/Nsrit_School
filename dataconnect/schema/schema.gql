@@ -113,6 +113,7 @@ type User @table(name: "users", key: "id") {
   branch: Branch
   wing: Wing
   isActive: Boolean! @default(value: true)
+  fcmToken: String @col(name: "fcm_token", dataType: "varchar(300)")
   createdAt: Timestamp! @default(expr: "request.time")
   updatedAt: Timestamp! @default(expr: "request.time")
 }
@@ -311,6 +312,7 @@ type Student @table(name: "students", key: "id") {
   dateOfBirth: Date
   photoUrl: String
   aadhaarNumber: String @col(name: "aadhaar_number", dataType: "varchar(20)")
+  apaarId: String @col(name: "apaar_id", dataType: "varchar(20)")
   bloodGroup: String @col(dataType: "varchar(10)")
   branch: Branch!
   wing: Wing
@@ -1031,6 +1033,7 @@ type ExamSubjectConfig
   subjectName: String! @col(name: "subject_name", dataType: "varchar(120)")
   maxMarks: Float! @col(name: "max_marks")
   passingMarks: Float! @col(name: "passing_marks")
+  examDate: Date @col(name: "exam_date")
   createdAt: Timestamp! @default(expr: "request.time")
   updatedAt: Timestamp! @default(expr: "request.time")
 }

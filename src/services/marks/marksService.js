@@ -223,15 +223,14 @@ const marksService = {
       });
       const students = data.students || [];
       for (const student of students) {
-        const parentUserId = student.parent?.user?.id || student.parent?.userId;
+        const parentUserId = student.parent?.userId;
         if (!parentUserId) continue;
         await dataConnectClient.mutate(DATA_CONNECT_MUTATIONS.CREATE_NOTIFICATION, {
           userId: parentUserId,
           branchId,
           title: 'Exam Results Published',
-          message: `Results for ${student.fullName} in ${examName} are now available.`,
+          message: `Results for ${student.fullName} in ${examName} are now available. Open the app to view marks and download the report card.`,
           category: 'EXAM_RESULT',
-          academicYear: academicYearId ? undefined : undefined,
           createdById: publishedById,
           createdByRole: role,
         });
@@ -288,6 +287,7 @@ const marksService = {
         subjectName: cfg.subjectName,
         maxMarks: cfg.maxMarks,
         passingMarks: cfg.passingMarks,
+        examDate: cfg.examDate || null,
         marksObtained: obtained,
         isAbsent: absent,
         passed,
