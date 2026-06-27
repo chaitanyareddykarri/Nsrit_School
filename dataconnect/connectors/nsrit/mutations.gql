@@ -5137,3 +5137,94 @@ mutation RecordMarksAuditLog(
     }
   )
 }
+
+mutation UpdateCoordinator(
+  $coordinatorId: UUID!
+  $userId: UUID!
+  $branchId: UUID!
+  $fullName: String!
+  $phoneNumber: String!
+  $email: String
+  $gender: String
+  $employeeId: String
+  $wing: String!
+  $isActive: Boolean!
+) @auth(level: USER) @transaction {
+  query @redact {
+    users(
+      where: {
+        _and: [
+          {firebaseUID: {eq_expr: "auth.uid"}}
+          {isActive: {eq: true}}
+          {
+            _or: [
+              {role: {in: ["MAIN_ADMIN", "main_admin"]}}
+              {userRoles_on_user: {exist: {role: {in: ["MAIN_ADMIN", "main_admin"]}}}}
+              {branches_on_principal: {exist: {id: {eq: $branchId}, isActive: {eq: true}}}}
+              {
+                _and: [
+                  {branchId: {eq: $branchId}}
+                  {
+                    _or: [
+                      {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin"]}}
+                      {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin"]}}}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "Branch admin access required") {
+      id
+      role
+      branchId
+    }
+    selectedCoordinator: coordinators(
+      where: {id: {eq: $coordinatorId}, branchId: {eq: $branchId}}
+      limit: 1
+    ) @check(expr: "this.exists(c, true)", message: "Coordinator not found in this branch") {
+      id
+    }
+    selectedUser: users(
+      where: {id: {eq: $userId}, branchId: {eq: $branchId}}
+      limit: 1
+    ) @check(expr: "this.exists(u, true)", message: "User not found in this branch") {
+      id
+    }
+  }
+  user_update(
+    id: $userId
+    data: {
+      fullName: $fullName
+      phoneNumber: $phoneNumber
+      employeeId: $employeeId
+      isActive: $isActive
+      updatedAt_expr: "request.time"
+    }
+  )
+  coordinator_update(
+    id: $coordinatorId
+    data: {
+      email: $email
+      gender: $gender
+      employeeId: $employeeId
+      wing: $wing
+      isActive: $isActive
+      updatedAt_expr: "request.time"
+    }
+  )
+  auditLog_insert(
+    data: {
+      performedBy_expr: "response.query.users[0].id"
+      performedRole_expr: "response.query.users[0].role"
+      action: "STAFF_UPDATED"
+      entityType: "STAFF"
+      entityId: $employeeId
+      branchId: $branchId
+      newData: "Coordinator profile updated"
+    }
+  )
+}

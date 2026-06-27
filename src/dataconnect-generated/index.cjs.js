@@ -1357,6 +1357,20 @@ exports.recordMarksAuditLog = function recordMarksAuditLog(dcOrVars, vars) {
 }
 ;
 
+const updateCoordinatorRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'UpdateCoordinator', inputVars);
+}
+updateCoordinatorRef.operationName = 'UpdateCoordinator';
+exports.updateCoordinatorRef = updateCoordinatorRef;
+
+exports.updateCoordinator = function updateCoordinator(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(updateCoordinatorRef(dcInstance, inputVars));
+}
+;
+
 const getCurrentUserRef = (dcOrVars, vars) => {
   const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
   dcInstance._useGeneratedSdk();

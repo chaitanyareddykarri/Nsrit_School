@@ -6110,6 +6110,25 @@ export interface UpdateClassTeacherAssignmentVariables {
   oldTeacherAuditId?: string | null;
 }
 
+export interface UpdateCoordinatorData {
+  user_update?: User_Key | null;
+  coordinator_update?: Coordinator_Key | null;
+  auditLog_insert: AuditLog_Key;
+}
+
+export interface UpdateCoordinatorVariables {
+  coordinatorId: UUIDString;
+  userId: UUIDString;
+  branchId: UUIDString;
+  fullName: string;
+  phoneNumber: string;
+  email?: string | null;
+  gender?: string | null;
+  employeeId?: string | null;
+  wing: string;
+  isActive: boolean;
+}
+
 export interface UpdateExamData {
   exam_update?: Exam_Key | null;
 }
@@ -7552,6 +7571,18 @@ export const recordMarksAuditLogRef: RecordMarksAuditLogRef;
 
 export function recordMarksAuditLog(vars: RecordMarksAuditLogVariables): MutationPromise<RecordMarksAuditLogData, RecordMarksAuditLogVariables>;
 export function recordMarksAuditLog(dc: DataConnect, vars: RecordMarksAuditLogVariables): MutationPromise<RecordMarksAuditLogData, RecordMarksAuditLogVariables>;
+
+interface UpdateCoordinatorRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: UpdateCoordinatorVariables): MutationRef<UpdateCoordinatorData, UpdateCoordinatorVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: UpdateCoordinatorVariables): MutationRef<UpdateCoordinatorData, UpdateCoordinatorVariables>;
+  operationName: string;
+}
+export const updateCoordinatorRef: UpdateCoordinatorRef;
+
+export function updateCoordinator(vars: UpdateCoordinatorVariables): MutationPromise<UpdateCoordinatorData, UpdateCoordinatorVariables>;
+export function updateCoordinator(dc: DataConnect, vars: UpdateCoordinatorVariables): MutationPromise<UpdateCoordinatorData, UpdateCoordinatorVariables>;
 
 interface GetCurrentUserRef {
   /* Allow users to create refs without passing in DataConnect */

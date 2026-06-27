@@ -41,17 +41,17 @@ const buildPendingFirebaseUID = ({branchId, phoneNumber}) =>
   `pending:teacher:${branchId}:${normalizePhoneNumber(phoneNumber)}`;
 
 const canManageTeachers = role =>
-  [USER_ROLES.PRINCIPAL, USER_ROLES.MAIN_ADMIN, USER_ROLES.COORDINATOR].includes(
+  [USER_ROLES.PRINCIPAL, USER_ROLES.MAIN_ADMIN, USER_ROLES.COORDINATOR, USER_ROLES.COMPUTER_OPERATOR].includes(
     normalizeRole(role),
   );
 
 const canViewTeachers = role =>
-  [USER_ROLES.PRINCIPAL, USER_ROLES.BRANCH_ADMIN, USER_ROLES.MAIN_ADMIN, USER_ROLES.COORDINATOR].includes(
+  [USER_ROLES.PRINCIPAL, USER_ROLES.BRANCH_ADMIN, USER_ROLES.MAIN_ADMIN, USER_ROLES.COORDINATOR, USER_ROLES.COMPUTER_OPERATOR].includes(
     normalizeRole(role),
   );
 
 const canManageClassTeacherAssignments = role =>
-  [USER_ROLES.PRINCIPAL, USER_ROLES.BRANCH_ADMIN, USER_ROLES.MAIN_ADMIN, USER_ROLES.COORDINATOR].includes(
+  [USER_ROLES.PRINCIPAL, USER_ROLES.BRANCH_ADMIN, USER_ROLES.MAIN_ADMIN, USER_ROLES.COORDINATOR, USER_ROLES.COMPUTER_OPERATOR].includes(
     normalizeRole(role),
   );
 

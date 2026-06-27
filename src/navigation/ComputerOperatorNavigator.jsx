@@ -180,7 +180,7 @@ const ComputerOperatorNavigator = () => (
       component={ComputerOperatorProfileScreen}
       options={{headerShown: false}}
     />
-    {renderFeeStackScreens(Stack)}
+    {renderFeeStackScreens(Stack, {reports: true, canUpload: true})}
   </Stack.Navigator>
 );
 

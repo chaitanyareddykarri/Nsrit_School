@@ -229,6 +229,7 @@ This README will guide you through the process of using the generated JavaScript
   - [*UnpublishExamSection*](#unpublishexamsection)
   - [*UpdateFcmToken*](#updatefcmtoken)
   - [*RecordMarksAuditLog*](#recordmarksauditlog)
+  - [*UpdateCoordinator*](#updatecoordinator)
 
 # Accessing the connector
 A connector is a collection of Queries and Mutations. One SDK is generated for each connector - this SDK is generated for the connector `nsrit`. You can find more information about connectors in the [Data Connect documentation](https://firebase.google.com/docs/data-connect#how-does).
@@ -30574,6 +30575,152 @@ console.log(data.marksAuditLog_insert);
 executeMutation(ref).then((response) => {
   const data = response.data;
   console.log(data.marksAuditLog_insert);
+});
+```
+
+## UpdateCoordinator
+You can execute the `UpdateCoordinator` mutation using the following action shortcut function, or by calling `executeMutation()` after calling the following `MutationRef` function, both of which are defined in [dataconnect-generated/index.d.ts](./index.d.ts):
+```typescript
+updateCoordinator(vars: UpdateCoordinatorVariables): MutationPromise<UpdateCoordinatorData, UpdateCoordinatorVariables>;
+
+interface UpdateCoordinatorRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: UpdateCoordinatorVariables): MutationRef<UpdateCoordinatorData, UpdateCoordinatorVariables>;
+}
+export const updateCoordinatorRef: UpdateCoordinatorRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `MutationRef` function.
+```typescript
+updateCoordinator(dc: DataConnect, vars: UpdateCoordinatorVariables): MutationPromise<UpdateCoordinatorData, UpdateCoordinatorVariables>;
+
+interface UpdateCoordinatorRef {
+  ...
+  (dc: DataConnect, vars: UpdateCoordinatorVariables): MutationRef<UpdateCoordinatorData, UpdateCoordinatorVariables>;
+}
+export const updateCoordinatorRef: UpdateCoordinatorRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the updateCoordinatorRef:
+```typescript
+const name = updateCoordinatorRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `UpdateCoordinator` mutation requires an argument of type `UpdateCoordinatorVariables`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface UpdateCoordinatorVariables {
+  coordinatorId: UUIDString;
+  userId: UUIDString;
+  branchId: UUIDString;
+  fullName: string;
+  phoneNumber: string;
+  email?: string | null;
+  gender?: string | null;
+  employeeId?: string | null;
+  wing: string;
+  isActive: boolean;
+}
+```
+### Return Type
+Recall that executing the `UpdateCoordinator` mutation returns a `MutationPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `UpdateCoordinatorData`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface UpdateCoordinatorData {
+  user_update?: User_Key | null;
+  coordinator_update?: Coordinator_Key | null;
+  auditLog_insert: AuditLog_Key;
+}
+```
+### Using `UpdateCoordinator`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, updateCoordinator, UpdateCoordinatorVariables } from '@dataconnect/generated';
+
+// The `UpdateCoordinator` mutation requires an argument of type `UpdateCoordinatorVariables`:
+const updateCoordinatorVars: UpdateCoordinatorVariables = {
+  coordinatorId: ..., 
+  userId: ..., 
+  branchId: ..., 
+  fullName: ..., 
+  phoneNumber: ..., 
+  email: ..., // optional
+  gender: ..., // optional
+  employeeId: ..., // optional
+  wing: ..., 
+  isActive: ..., 
+};
+
+// Call the `updateCoordinator()` function to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await updateCoordinator(updateCoordinatorVars);
+// Variables can be defined inline as well.
+const { data } = await updateCoordinator({ coordinatorId: ..., userId: ..., branchId: ..., fullName: ..., phoneNumber: ..., email: ..., gender: ..., employeeId: ..., wing: ..., isActive: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await updateCoordinator(dataConnect, updateCoordinatorVars);
+
+console.log(data.user_update);
+console.log(data.coordinator_update);
+console.log(data.auditLog_insert);
+
+// Or, you can use the `Promise` API.
+updateCoordinator(updateCoordinatorVars).then((response) => {
+  const data = response.data;
+  console.log(data.user_update);
+  console.log(data.coordinator_update);
+  console.log(data.auditLog_insert);
+});
+```
+
+### Using `UpdateCoordinator`'s `MutationRef` function
+
+```typescript
+import { getDataConnect, executeMutation } from 'firebase/data-connect';
+import { connectorConfig, updateCoordinatorRef, UpdateCoordinatorVariables } from '@dataconnect/generated';
+
+// The `UpdateCoordinator` mutation requires an argument of type `UpdateCoordinatorVariables`:
+const updateCoordinatorVars: UpdateCoordinatorVariables = {
+  coordinatorId: ..., 
+  userId: ..., 
+  branchId: ..., 
+  fullName: ..., 
+  phoneNumber: ..., 
+  email: ..., // optional
+  gender: ..., // optional
+  employeeId: ..., // optional
+  wing: ..., 
+  isActive: ..., 
+};
+
+// Call the `updateCoordinatorRef()` function to get a reference to the mutation.
+const ref = updateCoordinatorRef(updateCoordinatorVars);
+// Variables can be defined inline as well.
+const ref = updateCoordinatorRef({ coordinatorId: ..., userId: ..., branchId: ..., fullName: ..., phoneNumber: ..., email: ..., gender: ..., employeeId: ..., wing: ..., isActive: ..., });
+
+// You can also pass in a `DataConnect` instance to the `MutationRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = updateCoordinatorRef(dataConnect, updateCoordinatorVars);
+
+// Call `executeMutation()` on the reference to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeMutation(ref);
+
+console.log(data.user_update);
+console.log(data.coordinator_update);
+console.log(data.auditLog_insert);
+
+// Or, you can use the `Promise` API.
+executeMutation(ref).then((response) => {
+  const data = response.data;
+  console.log(data.user_update);
+  console.log(data.coordinator_update);
+  console.log(data.auditLog_insert);
 });
 ```
 
