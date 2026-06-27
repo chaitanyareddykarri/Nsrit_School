@@ -157,7 +157,7 @@ export const attendanceService = {
         attendanceDate: payload.attendanceDate,
         sectionId: payload.sectionId,
         previousStatus: existing.status,
-        branchId: scope.branchId,
+        branchId: existing.branchId || scope.branchId,
         academicYearId: scope.academicYearId || null,
       });
     }
@@ -209,7 +209,7 @@ export const attendanceService = {
           attendanceDate: record.attendanceDate,
           sectionId: record.sectionId,
           previousStatus: existing.status,
-          branchId: scope.branchId || record.branchId,
+          branchId: existing.branchId || scope.branchId || record.branchId,
           academicYearId: scope.academicYearId || null,
         });
         saved.push(updated);

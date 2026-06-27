@@ -320,7 +320,7 @@ const EditAttendanceScreen = () => {
           attendanceDate:  selectedDate,
           sectionId:       selectedSection.id,
           previousStatus:  existing.status || '',
-          branchId:        user.branchId,
+          branchId:        existing.branchId || user.branchId,
           academicYearId:  scope?.academicYearId || null});
       }
       return changed.length;
@@ -331,6 +331,9 @@ const EditAttendanceScreen = () => {
       queryClient.invalidateQueries({queryKey: ['coordEditAttendance', selectedSectionId, selectedDate]});
       queryClient.invalidateQueries({queryKey: ['sectionAttendance', selectedSectionId, selectedDate]});
       queryClient.invalidateQueries({queryKey: ['sectionMonthMap', selectedSectionId]});
+      queryClient.invalidateQueries({queryKey: ['wingAttRecords', selectedSectionId, selectedDate]});
+      queryClient.invalidateQueries({queryKey: ['viewAttRecords', selectedSectionId, selectedDate]});
+      queryClient.invalidateQueries({queryKey: ['overviewAttendance', selectedSectionId, selectedDate]});
       queryClient.invalidateQueries({queryKey: ['parentAttendance']});
       queryClient.invalidateQueries({queryKey: ['parentAttendanceYear']});
       queryClient.invalidateQueries({queryKey: ['branchAttendance']});

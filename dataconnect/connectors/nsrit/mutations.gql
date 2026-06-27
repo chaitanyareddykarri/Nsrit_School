@@ -4526,9 +4526,18 @@ mutation CorrectAttendance(
       role
       branchId
     }
-    # Confirm the attendance record actually belongs to the branch the caller claims
+    # Confirm the attendance record belongs to the branch the caller claims.
+    # Records created before branchId was mandatory may have branchId = null — allow those too.
     attendanceRecord: attendances(
-      where: {id: {eq: $id}, branchId: {eq: $branchId}}
+      where: {
+        _and: [
+          {id: {eq: $id}}
+          {_or: [
+            {branchId: {eq: $branchId}}
+            {branchId: {isNull: true}}
+          ]}
+        ]
+      }
       limit: 1
     ) @check(expr: "this.exists(a, true)", message: "Attendance record not found in the specified branch") {
       id

@@ -1303,6 +1303,7 @@ export interface GetAttendanceBySectionData {
     studentId: UUIDString;
     academicClassId: UUIDString;
     sectionId: UUIDString;
+    branchId?: UUIDString | null;
     attendanceDate: DateString;
     status: string;
     markedById: UUIDString;
