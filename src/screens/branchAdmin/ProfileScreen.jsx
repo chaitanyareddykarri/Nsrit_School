@@ -54,7 +54,7 @@ const ProfileScreen = ({navigation}) => {
         <Text style={styles.cardSection}>Account Details</Text>
         <InfoRow icon="office-building-outline" label="Branch" value={user?.branchName || user?.branchId || '—'} />
         <InfoRow icon="phone-outline" label="Phone" value={user?.phoneNumber || '—'} />
-        <InfoRow icon="identifier" label="User ID" value={user?.id || '—'} />
+        <InfoRow icon="identifier" label="Employee ID" value={user?.employeeId || '—'} />
         <InfoRow icon="shield-check-outline" label="Role" value={ROLE_LABELS[role] || role || '—'} />
       </Animated.View>
 
