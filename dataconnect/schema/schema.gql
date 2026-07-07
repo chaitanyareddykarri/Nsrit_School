@@ -1099,3 +1099,22 @@ extend type MarksAuditLog {
   changedById: UUID!
 }
 
+
+# Tracks whether attendance has been submitted for a section on a specific date.
+type SectionAttendanceSession @table(name: "section_attendance_sessions", key: ["section", "date"])
+  @index(fields: ["branchId", "date"]) {
+  section: Section!
+  academicClass: AcademicClass!
+  branch: Branch!
+  date: Date!
+  submittedByTeacherId: UUID!
+  submittedByTeacherName: String! @col(name: "submitted_by_teacher_name", dataType: "varchar(150)")
+  submittedAt: Timestamp! @col(name: "submitted_at") @default(expr: "request.time")
+  isLocked: Boolean! @col(name: "is_locked") @default(value: true)
+}
+
+extend type SectionAttendanceSession {
+  sectionId: UUID!
+  academicClassId: UUID!
+  branchId: UUID!
+}

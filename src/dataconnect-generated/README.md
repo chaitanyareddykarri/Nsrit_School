@@ -132,6 +132,8 @@ This README will guide you through the process of using the generated JavaScript
   - [*GetExamAnalytics*](#getexamanalytics)
   - [*GetPublishedExamsForSection*](#getpublishedexamsforsection)
   - [*GetExamsBySection*](#getexamsbysection)
+  - [*GetSectionAttendanceSession*](#getsectionattendancesession)
+  - [*GetTodayAttendanceSessionsByBranch*](#gettodayattendancesessionsbybranch)
 - [**Mutations**](#mutations)
   - [*CreateBranch*](#createbranch)
   - [*UpdateBranch*](#updatebranch)
@@ -230,6 +232,7 @@ This README will guide you through the process of using the generated JavaScript
   - [*UpdateFcmToken*](#updatefcmtoken)
   - [*RecordMarksAuditLog*](#recordmarksauditlog)
   - [*UpdateCoordinator*](#updatecoordinator)
+  - [*UpsertSectionAttendanceSession*](#upsertsectionattendancesession)
 
 # Accessing the connector
 A connector is a collection of Queries and Mutations. One SDK is generated for each connector - this SDK is generated for the connector `nsrit`. You can find more information about connectors in the [Data Connect documentation](https://firebase.google.com/docs/data-connect#how-does).
@@ -18128,6 +18131,245 @@ executeQuery(ref).then((response) => {
 });
 ```
 
+## GetSectionAttendanceSession
+You can execute the `GetSectionAttendanceSession` query using the following action shortcut function, or by calling `executeQuery()` after calling the following `QueryRef` function, both of which are defined in [dataconnect-generated/index.d.ts](./index.d.ts):
+```typescript
+getSectionAttendanceSession(vars: GetSectionAttendanceSessionVariables, options?: ExecuteQueryOptions): QueryPromise<GetSectionAttendanceSessionData, GetSectionAttendanceSessionVariables>;
+
+interface GetSectionAttendanceSessionRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: GetSectionAttendanceSessionVariables): QueryRef<GetSectionAttendanceSessionData, GetSectionAttendanceSessionVariables>;
+}
+export const getSectionAttendanceSessionRef: GetSectionAttendanceSessionRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `QueryRef` function.
+```typescript
+getSectionAttendanceSession(dc: DataConnect, vars: GetSectionAttendanceSessionVariables, options?: ExecuteQueryOptions): QueryPromise<GetSectionAttendanceSessionData, GetSectionAttendanceSessionVariables>;
+
+interface GetSectionAttendanceSessionRef {
+  ...
+  (dc: DataConnect, vars: GetSectionAttendanceSessionVariables): QueryRef<GetSectionAttendanceSessionData, GetSectionAttendanceSessionVariables>;
+}
+export const getSectionAttendanceSessionRef: GetSectionAttendanceSessionRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the getSectionAttendanceSessionRef:
+```typescript
+const name = getSectionAttendanceSessionRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `GetSectionAttendanceSession` query requires an argument of type `GetSectionAttendanceSessionVariables`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface GetSectionAttendanceSessionVariables {
+  sectionId: UUIDString;
+  date: DateString;
+}
+```
+### Return Type
+Recall that executing the `GetSectionAttendanceSession` query returns a `QueryPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `GetSectionAttendanceSessionData`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface GetSectionAttendanceSessionData {
+  sectionAttendanceSession?: {
+    sectionId: UUIDString;
+    date: DateString;
+    submittedByTeacherId: UUIDString;
+    submittedByTeacherName: string;
+    submittedAt: TimestampString;
+    isLocked: boolean;
+  } & SectionAttendanceSession_Key;
+}
+```
+### Using `GetSectionAttendanceSession`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, getSectionAttendanceSession, GetSectionAttendanceSessionVariables } from '@dataconnect/generated';
+
+// The `GetSectionAttendanceSession` query requires an argument of type `GetSectionAttendanceSessionVariables`:
+const getSectionAttendanceSessionVars: GetSectionAttendanceSessionVariables = {
+  sectionId: ..., 
+  date: ..., 
+};
+
+// Call the `getSectionAttendanceSession()` function to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await getSectionAttendanceSession(getSectionAttendanceSessionVars);
+// Variables can be defined inline as well.
+const { data } = await getSectionAttendanceSession({ sectionId: ..., date: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await getSectionAttendanceSession(dataConnect, getSectionAttendanceSessionVars);
+
+console.log(data.sectionAttendanceSession);
+
+// Or, you can use the `Promise` API.
+getSectionAttendanceSession(getSectionAttendanceSessionVars).then((response) => {
+  const data = response.data;
+  console.log(data.sectionAttendanceSession);
+});
+```
+
+### Using `GetSectionAttendanceSession`'s `QueryRef` function
+
+```typescript
+import { getDataConnect, executeQuery } from 'firebase/data-connect';
+import { connectorConfig, getSectionAttendanceSessionRef, GetSectionAttendanceSessionVariables } from '@dataconnect/generated';
+
+// The `GetSectionAttendanceSession` query requires an argument of type `GetSectionAttendanceSessionVariables`:
+const getSectionAttendanceSessionVars: GetSectionAttendanceSessionVariables = {
+  sectionId: ..., 
+  date: ..., 
+};
+
+// Call the `getSectionAttendanceSessionRef()` function to get a reference to the query.
+const ref = getSectionAttendanceSessionRef(getSectionAttendanceSessionVars);
+// Variables can be defined inline as well.
+const ref = getSectionAttendanceSessionRef({ sectionId: ..., date: ..., });
+
+// You can also pass in a `DataConnect` instance to the `QueryRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = getSectionAttendanceSessionRef(dataConnect, getSectionAttendanceSessionVars);
+
+// Call `executeQuery()` on the reference to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeQuery(ref);
+
+console.log(data.sectionAttendanceSession);
+
+// Or, you can use the `Promise` API.
+executeQuery(ref).then((response) => {
+  const data = response.data;
+  console.log(data.sectionAttendanceSession);
+});
+```
+
+## GetTodayAttendanceSessionsByBranch
+You can execute the `GetTodayAttendanceSessionsByBranch` query using the following action shortcut function, or by calling `executeQuery()` after calling the following `QueryRef` function, both of which are defined in [dataconnect-generated/index.d.ts](./index.d.ts):
+```typescript
+getTodayAttendanceSessionsByBranch(vars: GetTodayAttendanceSessionsByBranchVariables, options?: ExecuteQueryOptions): QueryPromise<GetTodayAttendanceSessionsByBranchData, GetTodayAttendanceSessionsByBranchVariables>;
+
+interface GetTodayAttendanceSessionsByBranchRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: GetTodayAttendanceSessionsByBranchVariables): QueryRef<GetTodayAttendanceSessionsByBranchData, GetTodayAttendanceSessionsByBranchVariables>;
+}
+export const getTodayAttendanceSessionsByBranchRef: GetTodayAttendanceSessionsByBranchRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `QueryRef` function.
+```typescript
+getTodayAttendanceSessionsByBranch(dc: DataConnect, vars: GetTodayAttendanceSessionsByBranchVariables, options?: ExecuteQueryOptions): QueryPromise<GetTodayAttendanceSessionsByBranchData, GetTodayAttendanceSessionsByBranchVariables>;
+
+interface GetTodayAttendanceSessionsByBranchRef {
+  ...
+  (dc: DataConnect, vars: GetTodayAttendanceSessionsByBranchVariables): QueryRef<GetTodayAttendanceSessionsByBranchData, GetTodayAttendanceSessionsByBranchVariables>;
+}
+export const getTodayAttendanceSessionsByBranchRef: GetTodayAttendanceSessionsByBranchRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the getTodayAttendanceSessionsByBranchRef:
+```typescript
+const name = getTodayAttendanceSessionsByBranchRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `GetTodayAttendanceSessionsByBranch` query requires an argument of type `GetTodayAttendanceSessionsByBranchVariables`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface GetTodayAttendanceSessionsByBranchVariables {
+  branchId: UUIDString;
+  date: DateString;
+}
+```
+### Return Type
+Recall that executing the `GetTodayAttendanceSessionsByBranch` query returns a `QueryPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `GetTodayAttendanceSessionsByBranchData`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface GetTodayAttendanceSessionsByBranchData {
+  sectionAttendanceSessions: ({
+    sectionId: UUIDString;
+    academicClassId: UUIDString;
+    date: DateString;
+    submittedByTeacherId: UUIDString;
+    submittedByTeacherName: string;
+    submittedAt: TimestampString;
+    isLocked: boolean;
+  } & SectionAttendanceSession_Key)[];
+}
+```
+### Using `GetTodayAttendanceSessionsByBranch`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, getTodayAttendanceSessionsByBranch, GetTodayAttendanceSessionsByBranchVariables } from '@dataconnect/generated';
+
+// The `GetTodayAttendanceSessionsByBranch` query requires an argument of type `GetTodayAttendanceSessionsByBranchVariables`:
+const getTodayAttendanceSessionsByBranchVars: GetTodayAttendanceSessionsByBranchVariables = {
+  branchId: ..., 
+  date: ..., 
+};
+
+// Call the `getTodayAttendanceSessionsByBranch()` function to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await getTodayAttendanceSessionsByBranch(getTodayAttendanceSessionsByBranchVars);
+// Variables can be defined inline as well.
+const { data } = await getTodayAttendanceSessionsByBranch({ branchId: ..., date: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await getTodayAttendanceSessionsByBranch(dataConnect, getTodayAttendanceSessionsByBranchVars);
+
+console.log(data.sectionAttendanceSessions);
+
+// Or, you can use the `Promise` API.
+getTodayAttendanceSessionsByBranch(getTodayAttendanceSessionsByBranchVars).then((response) => {
+  const data = response.data;
+  console.log(data.sectionAttendanceSessions);
+});
+```
+
+### Using `GetTodayAttendanceSessionsByBranch`'s `QueryRef` function
+
+```typescript
+import { getDataConnect, executeQuery } from 'firebase/data-connect';
+import { connectorConfig, getTodayAttendanceSessionsByBranchRef, GetTodayAttendanceSessionsByBranchVariables } from '@dataconnect/generated';
+
+// The `GetTodayAttendanceSessionsByBranch` query requires an argument of type `GetTodayAttendanceSessionsByBranchVariables`:
+const getTodayAttendanceSessionsByBranchVars: GetTodayAttendanceSessionsByBranchVariables = {
+  branchId: ..., 
+  date: ..., 
+};
+
+// Call the `getTodayAttendanceSessionsByBranchRef()` function to get a reference to the query.
+const ref = getTodayAttendanceSessionsByBranchRef(getTodayAttendanceSessionsByBranchVars);
+// Variables can be defined inline as well.
+const ref = getTodayAttendanceSessionsByBranchRef({ branchId: ..., date: ..., });
+
+// You can also pass in a `DataConnect` instance to the `QueryRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = getTodayAttendanceSessionsByBranchRef(dataConnect, getTodayAttendanceSessionsByBranchVars);
+
+// Call `executeQuery()` on the reference to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeQuery(ref);
+
+console.log(data.sectionAttendanceSessions);
+
+// Or, you can use the `Promise` API.
+executeQuery(ref).then((response) => {
+  const data = response.data;
+  console.log(data.sectionAttendanceSessions);
+});
+```
+
 # Mutations
 
 There are two ways to execute a Data Connect Mutation using the generated Web SDK:
@@ -30722,6 +30964,130 @@ executeMutation(ref).then((response) => {
   console.log(data.user_update);
   console.log(data.coordinator_update);
   console.log(data.auditLog_insert);
+});
+```
+
+## UpsertSectionAttendanceSession
+You can execute the `UpsertSectionAttendanceSession` mutation using the following action shortcut function, or by calling `executeMutation()` after calling the following `MutationRef` function, both of which are defined in [dataconnect-generated/index.d.ts](./index.d.ts):
+```typescript
+upsertSectionAttendanceSession(vars: UpsertSectionAttendanceSessionVariables): MutationPromise<UpsertSectionAttendanceSessionData, UpsertSectionAttendanceSessionVariables>;
+
+interface UpsertSectionAttendanceSessionRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: UpsertSectionAttendanceSessionVariables): MutationRef<UpsertSectionAttendanceSessionData, UpsertSectionAttendanceSessionVariables>;
+}
+export const upsertSectionAttendanceSessionRef: UpsertSectionAttendanceSessionRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `MutationRef` function.
+```typescript
+upsertSectionAttendanceSession(dc: DataConnect, vars: UpsertSectionAttendanceSessionVariables): MutationPromise<UpsertSectionAttendanceSessionData, UpsertSectionAttendanceSessionVariables>;
+
+interface UpsertSectionAttendanceSessionRef {
+  ...
+  (dc: DataConnect, vars: UpsertSectionAttendanceSessionVariables): MutationRef<UpsertSectionAttendanceSessionData, UpsertSectionAttendanceSessionVariables>;
+}
+export const upsertSectionAttendanceSessionRef: UpsertSectionAttendanceSessionRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the upsertSectionAttendanceSessionRef:
+```typescript
+const name = upsertSectionAttendanceSessionRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `UpsertSectionAttendanceSession` mutation requires an argument of type `UpsertSectionAttendanceSessionVariables`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface UpsertSectionAttendanceSessionVariables {
+  sectionId: UUIDString;
+  academicClassId: UUIDString;
+  branchId: UUIDString;
+  date: DateString;
+  submittedByTeacherId: UUIDString;
+  submittedByTeacherName: string;
+}
+```
+### Return Type
+Recall that executing the `UpsertSectionAttendanceSession` mutation returns a `MutationPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `UpsertSectionAttendanceSessionData`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface UpsertSectionAttendanceSessionData {
+  sectionAttendanceSession_upsert: SectionAttendanceSession_Key;
+}
+```
+### Using `UpsertSectionAttendanceSession`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, upsertSectionAttendanceSession, UpsertSectionAttendanceSessionVariables } from '@dataconnect/generated';
+
+// The `UpsertSectionAttendanceSession` mutation requires an argument of type `UpsertSectionAttendanceSessionVariables`:
+const upsertSectionAttendanceSessionVars: UpsertSectionAttendanceSessionVariables = {
+  sectionId: ..., 
+  academicClassId: ..., 
+  branchId: ..., 
+  date: ..., 
+  submittedByTeacherId: ..., 
+  submittedByTeacherName: ..., 
+};
+
+// Call the `upsertSectionAttendanceSession()` function to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await upsertSectionAttendanceSession(upsertSectionAttendanceSessionVars);
+// Variables can be defined inline as well.
+const { data } = await upsertSectionAttendanceSession({ sectionId: ..., academicClassId: ..., branchId: ..., date: ..., submittedByTeacherId: ..., submittedByTeacherName: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await upsertSectionAttendanceSession(dataConnect, upsertSectionAttendanceSessionVars);
+
+console.log(data.sectionAttendanceSession_upsert);
+
+// Or, you can use the `Promise` API.
+upsertSectionAttendanceSession(upsertSectionAttendanceSessionVars).then((response) => {
+  const data = response.data;
+  console.log(data.sectionAttendanceSession_upsert);
+});
+```
+
+### Using `UpsertSectionAttendanceSession`'s `MutationRef` function
+
+```typescript
+import { getDataConnect, executeMutation } from 'firebase/data-connect';
+import { connectorConfig, upsertSectionAttendanceSessionRef, UpsertSectionAttendanceSessionVariables } from '@dataconnect/generated';
+
+// The `UpsertSectionAttendanceSession` mutation requires an argument of type `UpsertSectionAttendanceSessionVariables`:
+const upsertSectionAttendanceSessionVars: UpsertSectionAttendanceSessionVariables = {
+  sectionId: ..., 
+  academicClassId: ..., 
+  branchId: ..., 
+  date: ..., 
+  submittedByTeacherId: ..., 
+  submittedByTeacherName: ..., 
+};
+
+// Call the `upsertSectionAttendanceSessionRef()` function to get a reference to the mutation.
+const ref = upsertSectionAttendanceSessionRef(upsertSectionAttendanceSessionVars);
+// Variables can be defined inline as well.
+const ref = upsertSectionAttendanceSessionRef({ sectionId: ..., academicClassId: ..., branchId: ..., date: ..., submittedByTeacherId: ..., submittedByTeacherName: ..., });
+
+// You can also pass in a `DataConnect` instance to the `MutationRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = upsertSectionAttendanceSessionRef(dataConnect, upsertSectionAttendanceSessionVars);
+
+// Call `executeMutation()` on the reference to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeMutation(ref);
+
+console.log(data.sectionAttendanceSession_upsert);
+
+// Or, you can use the `Promise` API.
+executeMutation(ref).then((response) => {
+  const data = response.data;
+  console.log(data.sectionAttendanceSession_upsert);
 });
 ```
 

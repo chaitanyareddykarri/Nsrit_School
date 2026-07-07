@@ -1,4 +1,4 @@
-﻿import React, {useMemo, useState} from 'react';
+import React, {useMemo, useState} from 'react';
 import {FlatList, Pressable, StyleSheet, TextInput, View} from 'react-native';
 import {Text} from 'react-native-paper';
 import Animated, {} from 'react-native-reanimated';
@@ -172,11 +172,16 @@ const FeeCollectionScreen = ({navigation, route}) => {
       queryClient.invalidateQueries({queryKey: ['paymentHistory']});
       queryClient.invalidateQueries({queryKey: ['feeReports']});
       queryClient.invalidateQueries({queryKey: ['coordinatorFeeDashboard']});
+      queryClient.invalidateQueries({queryKey: ['branchAdminFeeDashboard']});
       queryClient.invalidateQueries({queryKey: ['accountantFeeDashboard']});
+      queryClient.invalidateQueries({queryKey: ['operatorDashboard']});
+      queryClient.invalidateQueries({queryKey: ['operatorFeeSummary']});
+      queryClient.invalidateQueries({queryKey: ['teacherFeeStatus']});
       queryClient.invalidateQueries({queryKey: ['principalFeeSummary']});
       queryClient.invalidateQueries({queryKey: ['parentChildren']});
       queryClient.invalidateQueries({queryKey: ['parentDashboard']});
       queryClient.invalidateQueries({queryKey: ['studentDetails', selectedStudentId]});
+      queryClient.invalidateQueries({queryKey: ['mainAdminRevenue']});
       // Notify the parent's Notification Center of the receipt (new payments only).
       if (!editingPayment && payment) {
         feeService
@@ -215,8 +220,15 @@ const FeeCollectionScreen = ({navigation, route}) => {
       queryClient.invalidateQueries({queryKey: ['studentFeeProfile', selectedStudentId]});
       queryClient.invalidateQueries({queryKey: ['paymentHistory']});
       queryClient.invalidateQueries({queryKey: ['feeReports']});
+      queryClient.invalidateQueries({queryKey: ['coordinatorFeeDashboard']});
+      queryClient.invalidateQueries({queryKey: ['branchAdminFeeDashboard']});
+      queryClient.invalidateQueries({queryKey: ['operatorDashboard']});
+      queryClient.invalidateQueries({queryKey: ['operatorFeeSummary']});
+      queryClient.invalidateQueries({queryKey: ['teacherFeeStatus']});
+      queryClient.invalidateQueries({queryKey: ['principalFeeSummary']});
       queryClient.invalidateQueries({queryKey: ['parentChildren']});
       queryClient.invalidateQueries({queryKey: ['parentDashboard']});
+      queryClient.invalidateQueries({queryKey: ['mainAdminRevenue']});
     },
     onError: err => setError(err.message)});
 

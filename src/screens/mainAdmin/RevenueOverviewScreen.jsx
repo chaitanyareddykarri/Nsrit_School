@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import {ActivityIndicator, RefreshControl, ScrollView, StyleSheet, View, Text} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import Animated, {} from 'react-native-reanimated';
@@ -41,6 +41,13 @@ const RevenueOverviewScreen = ({navigation}) => {
     queryKey: ['mainAdminRevenue'],
     queryFn: () => mainAdminService.getDashboardStatistics({forceRefresh: true}),
     staleTime: 2 * 60 * 1000});
+
+  React.useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      refetch();
+    });
+    return unsubscribe;
+  }, [navigation, refetch]);
 
   const collected = stats?.branchWiseCollection || 0;
   const dues = stats?.branchWiseDues || 0;

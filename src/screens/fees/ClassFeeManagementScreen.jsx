@@ -1,4 +1,4 @@
-﻿import React, {useMemo, useState} from 'react';
+import React, {useMemo, useState} from 'react';
 import {FlatList, Pressable, StyleSheet, Switch, TextInput, View} from 'react-native';
 import {Text} from 'react-native-paper';
 import Animated, {} from 'react-native-reanimated';
@@ -108,8 +108,15 @@ const ClassFeeManagementScreen = () => {
       queryClient.invalidateQueries({queryKey: ['classFees']});
       queryClient.invalidateQueries({queryKey: ['feeRecords']});
       queryClient.invalidateQueries({queryKey: ['feeReports']});
+      queryClient.invalidateQueries({queryKey: ['coordinatorFeeDashboard']});
+      queryClient.invalidateQueries({queryKey: ['branchAdminFeeDashboard']});
+      queryClient.invalidateQueries({queryKey: ['operatorDashboard']});
+      queryClient.invalidateQueries({queryKey: ['operatorFeeSummary']});
+      queryClient.invalidateQueries({queryKey: ['teacherFeeStatus']});
+      queryClient.invalidateQueries({queryKey: ['principalFeeSummary']});
       queryClient.invalidateQueries({queryKey: ['parentChildren']});
       queryClient.invalidateQueries({queryKey: ['parentDashboard']});
+      queryClient.invalidateQueries({queryKey: ['mainAdminRevenue']});
       resetForm();
     },
     onError: err => setError(err.message)});

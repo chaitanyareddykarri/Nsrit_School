@@ -1,4 +1,4 @@
-﻿import React, {memo} from 'react';
+import React, {memo} from 'react';
 import {Pressable, StyleSheet, View} from 'react-native';
 import {Text} from 'react-native-paper';
 import Animated, {useAnimatedStyle, useSharedValue, withSpring} from 'react-native-reanimated';
@@ -19,33 +19,41 @@ const getInitials = name =>
 
 const getStatusMeta = status => {
   const s = String(status || ATTENDANCE_STATUS.PRESENT).toUpperCase();
-  return {
-    color:  ATTENDANCE_STATUS_COLORS[s]  || '#94A3B8',
-    icon:   ATTENDANCE_STATUS_ICONS[s]   || 'help-circle-outline',
-    label:  ATTENDANCE_STATUS_LABELS[s]  || s};
-};
+  let color = ATTENDANCE_STATUS_COLORS[s] || '#94A3B8';
+  let bg = `${color}09`;
+  let text = color;
+  let icon = ATTENDANCE_STATUS_ICONS[s] || 'help-circle-outline';
 
-// ── Compact status chip shown on each student row ─────────────────────────────
-const StatusChip = ({status}) => {
-  const {color, icon, label} = getStatusMeta(status);
-  return (
-    <View style={[chip.wrap, {backgroundColor: `${color}18`, borderColor: `${color}35`}]}>
-      <MaterialCommunityIcons name={icon} size={12} color={color} />
-      <Text style={[chip.label, {color}]}>{label}</Text>
-    </View>
-  );
+  if (s === 'PRESENT') {
+    color = '#10B981';
+    bg = '#E8F5E9';
+    text = '#1B5E20';
+    icon = 'check-circle';
+  } else if (s === 'ABSENT') {
+    color = '#EF4444';
+    bg = '#FFEBEE';
+    text = '#B71C1C';
+    icon = 'close-circle';
+  }
+
+  return {
+    color,
+    bg,
+    text,
+    icon,
+    label: ATTENDANCE_STATUS_LABELS[s] || s
+  };
 };
 
 const StudentListItem = ({
   student,
   status = ATTENDANCE_STATUS.PRESENT,
-  onToggle,      // if provided, tapping the row cycles through statuses (teacher mode)
+  onToggle,      // if provided, tapping the row cycles/toggles status (teacher mode)
   onStatusPress, // if provided, opens a full status picker (called with student.id)
   right,
   disabled}) => {
   const scale = useSharedValue(1);
-  const {color: accentColor} = getStatusMeta(status);
-  const bgTint = `${accentColor}09`;
+  const {color, bg, text, icon, label} = getStatusMeta(status);
 
   const animStyle = useAnimatedStyle(() => ({transform: [{scale: scale.value}]}));
 
@@ -54,8 +62,8 @@ const StudentListItem = ({
     scale.value = withSpring(0.965, {damping: 14, stiffness: 300}, () => {
       scale.value = withSpring(1, {damping: 11, stiffness: 240});
     });
-    if (onStatusPress) { onStatusPress(student.id); return; }
     if (onToggle) { onToggle(); }
+    else if (onStatusPress) { onStatusPress(student.id); }
   };
 
   return (
@@ -65,23 +73,28 @@ const StudentListItem = ({
       style={[
         animStyle,
         styles.wrapper,
-        {borderLeftColor: accentColor, backgroundColor: bgTint},
+        {borderLeftColor: color, backgroundColor: bg, borderColor: color},
       ]}>
       <View style={styles.row}>
-        <View style={[styles.avatar, {backgroundColor: `${accentColor}1F`}]}>
-          <Text style={[styles.avatarText, {color: accentColor}]}>
+        <View style={[styles.avatar, {backgroundColor: `${color}1F`}]}>
+          <Text style={[styles.avatarText, {color: text}]}>
             {getInitials(student.name)}
           </Text>
         </View>
         <View style={styles.copy}>
-          <Text style={styles.name} numberOfLines={1}>{student.name}</Text>
-          <Text style={styles.meta}>
+          <Text style={[styles.name, {color: text}]} numberOfLines={1}>{student.name}</Text>
+          <Text style={[styles.meta, {color: `${text}B0`}]}>
             {student.section ? `${student.section}  ·  ` : ''}Roll {student.rollNo}
           </Text>
         </View>
         {right != null
           ? right
-          : <StatusChip status={status} />}
+          : (
+            <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
+              <MaterialCommunityIcons name={icon} size={20} color={color} />
+              <Text style={{fontSize: 12, fontWeight: '700', color: text}}>{label}</Text>
+            </View>
+          )}
       </View>
     </AnimatedPressable>
   );

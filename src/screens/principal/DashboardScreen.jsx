@@ -1,4 +1,4 @@
-﻿import React, {useState, useCallback} from 'react';
+import React, {useState, useCallback} from 'react';
 import {Pressable, RefreshControl, ScrollView, StyleSheet, View} from 'react-native';
 import {Text} from 'react-native-paper';
 import Animated, {} from 'react-native-reanimated';
@@ -80,6 +80,14 @@ const DashboardScreen = ({navigation}) => {
     await Promise.allSettled([refetchDash(), refetchFee()]);
     setRefreshing(false);
   }, [refetchDash, refetchFee]);
+
+  React.useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      refetchDash();
+      refetchFee();
+    });
+    return unsubscribe;
+  }, [navigation, refetchDash, refetchFee]);
 
   const getGreeting = () => {
     const h = new Date().getHours();

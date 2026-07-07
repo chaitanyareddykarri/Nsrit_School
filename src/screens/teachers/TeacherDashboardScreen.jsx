@@ -1,4 +1,4 @@
-﻿import React, {useState} from 'react';
+import React, {useState} from 'react';
 import {Pressable, ScrollView, StyleSheet, View} from 'react-native';
 import {Text} from 'react-native-paper';
 import Animated, {} from 'react-native-reanimated';
@@ -31,16 +31,24 @@ const TeacherDashboardScreen = ({navigation}) => {
   const roleLabel = ROLE_LABELS[role] || 'Teacher';
   const isClassTeacherRole = role === USER_ROLES.CLASS_TEACHER;
 
-  const {data, isLoading} = useQuery({
+  const {data, isLoading, refetch: refetchDash} = useQuery({
     queryKey: ['teacherDashboard', teacherId, role],
     queryFn: () => teacherService.getTeacherDashboard(teacherId),
     enabled: Boolean(teacherId)});
 
-  const {data: feeData} = useQuery({
+  const {data: feeData, refetch: refetchFee} = useQuery({
     queryKey: ['teacherFeeStatus', access.branchId, access.academicClassId, access.sectionId],
     queryFn: () => feeService.getFeeReports(access),
     enabled: Boolean(access.branchId)});
   const feeSummary = feeData?.summary || {};
+
+  React.useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      refetchDash();
+      refetchFee();
+    });
+    return unsubscribe;
+  }, [navigation, refetchDash, refetchFee]);
 
   if (!teacherId) {
     return (

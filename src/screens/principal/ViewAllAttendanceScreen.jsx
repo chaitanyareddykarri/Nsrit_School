@@ -1,4 +1,4 @@
-﻿import React, {useMemo, useState} from 'react';
+import React, {useMemo, useState} from 'react';
 import {FlatList, Pressable, StyleSheet, View} from 'react-native';
 import {Text} from 'react-native-paper';
 import Animated, {} from 'react-native-reanimated';
@@ -82,6 +82,20 @@ const ViewAllAttendanceScreen = ({navigation}) => {
     [records],
   );
 
+  // ── Today Sessions Dashboard ──────────────────────────────────────────────
+  const sessionsQuery = useQuery({
+    queryKey: ['todayAttendanceSessions', user?.branchId, selectedDate],
+    queryFn: () => attendanceService.getTodayAttendanceSessions({branchId: user.branchId, date: selectedDate}),
+    enabled: Boolean(user?.branchId && selectedDate),
+  });
+  const sessionsMap = useMemo(() => {
+    const map = {};
+    (sessionsQuery.data || []).forEach(s => {
+      map[s.sectionId] = s;
+    });
+    return map;
+  }, [sessionsQuery.data]);
+
   // ── Date navigation ───────────────────────────────────────────────────────
   // FIX: use parseDateString + toISODate (local date arithmetic) instead of
   // d.toISOString().slice(0,10) which returns UTC and causes timezone skipping.
@@ -158,25 +172,45 @@ const ViewAllAttendanceScreen = ({navigation}) => {
             <View style={styles.heroDecor} />
             <Text style={styles.heroOverline}>{selectedClass?.name}</Text>
             <Text style={styles.heroTitle}>Select Section</Text>
-            <Text style={styles.heroSub}>Choose a section to view attendance</Text>
+            <Text style={styles.heroSub}>Choose a section to view its attendance</Text>
           </Animated.View>
         </View>
       }
-      renderItem={({item, index}) => (
-        <Animated.View>
-          <Pressable
-            onPress={() => { setSelectedSection(item); setStep('attendance'); }}
-            style={({pressed}) => [styles.selCard, pressed && {opacity: 0.82}]}>
-            <View style={[styles.selIcon, {backgroundColor: `${colors.info}15`}]}>
-              <MaterialCommunityIcons name="account-group-outline" size={20} color={colors.info} />
-            </View>
-            <Text style={styles.selLabel}>
-              {selectedClass?.name} – {item.name}
-            </Text>
-            <MaterialCommunityIcons name="chevron-right" size={18} color={colors.textSoft} />
-          </Pressable>
-        </Animated.View>
-      )}
+      renderItem={({item, index}) => {
+        const session = sessionsMap[item.id];
+        const isSubmitted = Boolean(session);
+        return (
+          <Animated.View style={styles.listItem}>
+            <Pressable
+              onPress={() => {
+                setSelectedSection(item);
+                setStep('attendance');
+              }}
+              style={({pressed}) => [styles.selCard, pressed && {opacity: 0.82}]}>
+              <View style={[styles.selIcon, {backgroundColor: `${colors.info}15`}]}>
+                <MaterialCommunityIcons name="account-group-outline" size={20} color={colors.info} />
+              </View>
+              <View style={{flex: 1, paddingRight: 8}}>
+                <Text style={styles.selLabel}>Section {item.name}</Text>
+                {isSubmitted ? (
+                  <View style={{flexDirection: 'row', alignItems: 'center', marginTop: 2}}>
+                    <MaterialCommunityIcons name="check-circle" size={12} color={colors.success} />
+                    <Text style={{fontSize: 11, color: colors.success, marginLeft: 4}}>
+                      Submitted by {session.submittedByTeacherName}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={{flexDirection: 'row', alignItems: 'center', marginTop: 2}}>
+                    <MaterialCommunityIcons name="clock-alert-outline" size={12} color={colors.danger} />
+                    <Text style={{fontSize: 11, color: colors.danger, marginLeft: 4}}>Pending</Text>
+                  </View>
+                )}
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={18} color={colors.textSoft} />
+            </Pressable>
+          </Animated.View>
+        );
+      }}
       ListEmptyComponent={
         sectionsQuery.isLoading ? (
           <SkeletonLoader rows={3} />

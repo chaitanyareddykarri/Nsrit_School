@@ -3975,6 +3975,22 @@ export interface GetReceiptSequenceVariables {
   branchCode: string;
 }
 
+export interface GetSectionAttendanceSessionData {
+  sectionAttendanceSession?: {
+    sectionId: UUIDString;
+    date: DateString;
+    submittedByTeacherId: UUIDString;
+    submittedByTeacherName: string;
+    submittedAt: TimestampString;
+    isLocked: boolean;
+  } & SectionAttendanceSession_Key;
+}
+
+export interface GetSectionAttendanceSessionVariables {
+  sectionId: UUIDString;
+  date: DateString;
+}
+
 export interface GetSectionClassTeacherData {
   sections: ({
     id: UUIDString;
@@ -5423,6 +5439,23 @@ export interface GetTimetablesForWingVariables {
   wingId: UUIDString;
 }
 
+export interface GetTodayAttendanceSessionsByBranchData {
+  sectionAttendanceSessions: ({
+    sectionId: UUIDString;
+    academicClassId: UUIDString;
+    date: DateString;
+    submittedByTeacherId: UUIDString;
+    submittedByTeacherName: string;
+    submittedAt: TimestampString;
+    isLocked: boolean;
+  } & SectionAttendanceSession_Key)[];
+}
+
+export interface GetTodayAttendanceSessionsByBranchVariables {
+  branchId: UUIDString;
+  date: DateString;
+}
+
 export interface GetUnreadNotificationCountData {
   notifications: ({
     id: UUIDString;
@@ -5830,6 +5863,12 @@ export interface SearchStudentsVariables {
   branchId: UUIDString;
   searchText: string;
   limit?: number | null;
+}
+
+export interface SectionAttendanceSession_Key {
+  sectionId: UUIDString;
+  date: DateString;
+  __typename?: 'SectionAttendanceSession_Key';
 }
 
 export interface Section_Key {
@@ -6353,6 +6392,19 @@ export interface UpsertExamSubjectConfigVariables {
   maxMarks: number;
   passingMarks: number;
   examDate?: DateString | null;
+}
+
+export interface UpsertSectionAttendanceSessionData {
+  sectionAttendanceSession_upsert: SectionAttendanceSession_Key;
+}
+
+export interface UpsertSectionAttendanceSessionVariables {
+  sectionId: UUIDString;
+  academicClassId: UUIDString;
+  branchId: UUIDString;
+  date: DateString;
+  submittedByTeacherId: UUIDString;
+  submittedByTeacherName: string;
 }
 
 export interface UpsertStudentMarkData {
@@ -7584,6 +7636,18 @@ export const updateCoordinatorRef: UpdateCoordinatorRef;
 
 export function updateCoordinator(vars: UpdateCoordinatorVariables): MutationPromise<UpdateCoordinatorData, UpdateCoordinatorVariables>;
 export function updateCoordinator(dc: DataConnect, vars: UpdateCoordinatorVariables): MutationPromise<UpdateCoordinatorData, UpdateCoordinatorVariables>;
+
+interface UpsertSectionAttendanceSessionRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: UpsertSectionAttendanceSessionVariables): MutationRef<UpsertSectionAttendanceSessionData, UpsertSectionAttendanceSessionVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: UpsertSectionAttendanceSessionVariables): MutationRef<UpsertSectionAttendanceSessionData, UpsertSectionAttendanceSessionVariables>;
+  operationName: string;
+}
+export const upsertSectionAttendanceSessionRef: UpsertSectionAttendanceSessionRef;
+
+export function upsertSectionAttendanceSession(vars: UpsertSectionAttendanceSessionVariables): MutationPromise<UpsertSectionAttendanceSessionData, UpsertSectionAttendanceSessionVariables>;
+export function upsertSectionAttendanceSession(dc: DataConnect, vars: UpsertSectionAttendanceSessionVariables): MutationPromise<UpsertSectionAttendanceSessionData, UpsertSectionAttendanceSessionVariables>;
 
 interface GetCurrentUserRef {
   /* Allow users to create refs without passing in DataConnect */
@@ -9072,4 +9136,28 @@ export const getExamsBySectionRef: GetExamsBySectionRef;
 
 export function getExamsBySection(vars: GetExamsBySectionVariables, options?: ExecuteQueryOptions): QueryPromise<GetExamsBySectionData, GetExamsBySectionVariables>;
 export function getExamsBySection(dc: DataConnect, vars: GetExamsBySectionVariables, options?: ExecuteQueryOptions): QueryPromise<GetExamsBySectionData, GetExamsBySectionVariables>;
+
+interface GetSectionAttendanceSessionRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: GetSectionAttendanceSessionVariables): QueryRef<GetSectionAttendanceSessionData, GetSectionAttendanceSessionVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: GetSectionAttendanceSessionVariables): QueryRef<GetSectionAttendanceSessionData, GetSectionAttendanceSessionVariables>;
+  operationName: string;
+}
+export const getSectionAttendanceSessionRef: GetSectionAttendanceSessionRef;
+
+export function getSectionAttendanceSession(vars: GetSectionAttendanceSessionVariables, options?: ExecuteQueryOptions): QueryPromise<GetSectionAttendanceSessionData, GetSectionAttendanceSessionVariables>;
+export function getSectionAttendanceSession(dc: DataConnect, vars: GetSectionAttendanceSessionVariables, options?: ExecuteQueryOptions): QueryPromise<GetSectionAttendanceSessionData, GetSectionAttendanceSessionVariables>;
+
+interface GetTodayAttendanceSessionsByBranchRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: GetTodayAttendanceSessionsByBranchVariables): QueryRef<GetTodayAttendanceSessionsByBranchData, GetTodayAttendanceSessionsByBranchVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: GetTodayAttendanceSessionsByBranchVariables): QueryRef<GetTodayAttendanceSessionsByBranchData, GetTodayAttendanceSessionsByBranchVariables>;
+  operationName: string;
+}
+export const getTodayAttendanceSessionsByBranchRef: GetTodayAttendanceSessionsByBranchRef;
+
+export function getTodayAttendanceSessionsByBranch(vars: GetTodayAttendanceSessionsByBranchVariables, options?: ExecuteQueryOptions): QueryPromise<GetTodayAttendanceSessionsByBranchData, GetTodayAttendanceSessionsByBranchVariables>;
+export function getTodayAttendanceSessionsByBranch(dc: DataConnect, vars: GetTodayAttendanceSessionsByBranchVariables, options?: ExecuteQueryOptions): QueryPromise<GetTodayAttendanceSessionsByBranchData, GetTodayAttendanceSessionsByBranchVariables>;
 

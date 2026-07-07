@@ -1,4 +1,4 @@
-﻿import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {Pressable, ScrollView, StyleSheet, View} from 'react-native';
 import {Text} from 'react-native-paper';
 import Animated, {} from 'react-native-reanimated';
@@ -36,10 +36,17 @@ const DashboardScreen = ({navigation}) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const access = useFeeAccess();
 
-  const {data} = useQuery({
+  const {data, refetch} = useQuery({
     queryKey: ['branchAdminFeeDashboard', access.branchId],
     queryFn: () => feeService.getFeeReports(access),
     enabled: Boolean(access.branchId)});
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      refetch();
+    });
+    return unsubscribe;
+  }, [navigation, refetch]);
   const summary = data?.summary || {};
   const collectionRate = Math.round((summary.collectionRate || 0) * 100);
 

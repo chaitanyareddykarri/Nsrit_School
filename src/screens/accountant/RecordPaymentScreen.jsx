@@ -1,4 +1,4 @@
-﻿import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -12,6 +12,7 @@ import {Text} from 'react-native-paper';
 import Animated, {} from 'react-native-reanimated';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import {useDispatch, useSelector} from 'react-redux';
+import {useQueryClient} from '@tanstack/react-query';
 import {uploadOfflinePayment} from '../../store/slices/feeSlice';
 import {ConfirmationModal} from '../../components';
 import StudentSearchModal from './components/StudentSearchModal';
@@ -47,6 +48,7 @@ const InputField = ({icon, placeholder, value, onChangeText, keyboardType, prefi
 
 const RecordPaymentScreen = ({navigation}) => {
   const dispatch = useDispatch();
+  const queryClient = useQueryClient();
   const {submitting, error} = useSelector(state => state.fees);
 
   const [selectedStudent, setSelectedStudent] = useState(null);
@@ -103,6 +105,22 @@ const RecordPaymentScreen = ({navigation}) => {
     );
 
     if (uploadOfflinePayment.fulfilled.match(action)) {
+      queryClient.invalidateQueries({queryKey: ['feeRecords']});
+      if (selectedStudent?.id) {
+        queryClient.invalidateQueries({queryKey: ['studentFeeProfile', selectedStudent.id]});
+        queryClient.invalidateQueries({queryKey: ['studentDetails', selectedStudent.id]});
+      }
+      queryClient.invalidateQueries({queryKey: ['paymentHistory']});
+      queryClient.invalidateQueries({queryKey: ['feeReports']});
+      queryClient.invalidateQueries({queryKey: ['coordinatorFeeDashboard']});
+      queryClient.invalidateQueries({queryKey: ['branchAdminFeeDashboard']});
+      queryClient.invalidateQueries({queryKey: ['operatorDashboard']});
+      queryClient.invalidateQueries({queryKey: ['operatorFeeSummary']});
+      queryClient.invalidateQueries({queryKey: ['teacherFeeStatus']});
+      queryClient.invalidateQueries({queryKey: ['principalFeeSummary']});
+      queryClient.invalidateQueries({queryKey: ['parentChildren']});
+      queryClient.invalidateQueries({queryKey: ['parentDashboard']});
+      queryClient.invalidateQueries({queryKey: ['mainAdminRevenue']});
       navigation.goBack();
     }
   };

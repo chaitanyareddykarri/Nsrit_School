@@ -1,4 +1,4 @@
-﻿import React, {useState} from 'react';
+import React, {useState} from 'react';
 import {Pressable, ScrollView, StyleSheet, View} from 'react-native';
 import {Text} from 'react-native-paper';
 import Animated, {} from 'react-native-reanimated';
@@ -54,11 +54,12 @@ const DashboardScreen = ({navigation}) => {
       if (persistedId) {
         setSelectedChildId(persistedId);
       }
+      refetch();
     });
     return unsubscribe;
-  }, [navigation]);
+  }, [navigation, refetch]);
 
-  const {data, error} = useQuery({
+  const {data, error, refetch} = useQuery({
     queryKey: ['parentDashboard', parentId],
     queryFn: () => parentService.getParentDashboard(parentId),
     enabled: Boolean(parentId)});

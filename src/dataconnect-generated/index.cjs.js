@@ -1371,6 +1371,20 @@ exports.updateCoordinator = function updateCoordinator(dcOrVars, vars) {
 }
 ;
 
+const upsertSectionAttendanceSessionRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'UpsertSectionAttendanceSession', inputVars);
+}
+upsertSectionAttendanceSessionRef.operationName = 'UpsertSectionAttendanceSession';
+exports.upsertSectionAttendanceSessionRef = upsertSectionAttendanceSessionRef;
+
+exports.upsertSectionAttendanceSession = function upsertSectionAttendanceSession(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(upsertSectionAttendanceSessionRef(dcInstance, inputVars));
+}
+;
+
 const getCurrentUserRef = (dcOrVars, vars) => {
   const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
   dcInstance._useGeneratedSdk();
@@ -3228,5 +3242,35 @@ exports.getExamsBySection = function getExamsBySection(dcOrVars, varsOrOptions, 
   
   const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrVars, varsOrOptions, options, true, true);
   return executeQuery(getExamsBySectionRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
+}
+;
+
+const getSectionAttendanceSessionRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return queryRef(dcInstance, 'GetSectionAttendanceSession', inputVars);
+}
+getSectionAttendanceSessionRef.operationName = 'GetSectionAttendanceSession';
+exports.getSectionAttendanceSessionRef = getSectionAttendanceSessionRef;
+
+exports.getSectionAttendanceSession = function getSectionAttendanceSession(dcOrVars, varsOrOptions, options) {
+  
+  const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrVars, varsOrOptions, options, true, true);
+  return executeQuery(getSectionAttendanceSessionRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
+}
+;
+
+const getTodayAttendanceSessionsByBranchRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return queryRef(dcInstance, 'GetTodayAttendanceSessionsByBranch', inputVars);
+}
+getTodayAttendanceSessionsByBranchRef.operationName = 'GetTodayAttendanceSessionsByBranch';
+exports.getTodayAttendanceSessionsByBranchRef = getTodayAttendanceSessionsByBranchRef;
+
+exports.getTodayAttendanceSessionsByBranch = function getTodayAttendanceSessionsByBranch(dcOrVars, varsOrOptions, options) {
+  
+  const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrVars, varsOrOptions, options, true, true);
+  return executeQuery(getTodayAttendanceSessionsByBranchRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
 }
 ;

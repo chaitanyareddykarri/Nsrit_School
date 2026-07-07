@@ -20,6 +20,17 @@ const normalise = r => ({
   status: normalizeAttendanceStatus(r.status) || r.status,
 });
 
+const sanitizeCreateAttendancePayload = payload => ({
+  studentId: payload.studentId,
+  academicClassId: payload.academicClassId,
+  sectionId: payload.sectionId,
+  branchId: payload.branchId,
+  attendanceDate: payload.attendanceDate,
+  status: payload.status,
+  markedById: payload.markedById,
+  remarks: payload.remarks || null,
+});
+
 export const summarizeAttendance = (records) => {
   if (!Array.isArray(records)) { records = []; }
   const norm = records.map(r => ({...r, status: normalizeAttendanceStatus(r.status) || r.status}));
@@ -132,6 +143,30 @@ export const attendanceService = {
 
   // ── Teacher: mark (first submission only) ─────────────────────────────────
 
+  async getAttendanceLockStatus(sectionId, date) {
+    if (!sectionId || !date) { return false; }
+    const res = await dataConnectClient.query(DATA_CONNECT_QUERIES.GET_ATTENDANCE_LOCK_STATUS, {sectionId, date});
+    return res.attendance?.length > 0 ? res.attendance[0].isLocked : false;
+  },
+
+  async getSectionAttendanceSession({sectionId, date}) {
+    if (!sectionId || !date) { return null; }
+    const response = await dataConnectClient.query(
+      DATA_CONNECT_QUERIES.GET_SECTION_ATTENDANCE_SESSION,
+      {sectionId, date},
+    );
+    return response.sectionAttendanceSession;
+  },
+
+  async getTodayAttendanceSessions({branchId, date}) {
+    if (!branchId || !date) { return []; }
+    const response = await dataConnectClient.query(
+      DATA_CONNECT_QUERIES.GET_TODAY_ATTENDANCE_SESSIONS_BY_BRANCH,
+      {branchId, date},
+    );
+    return response.sectionAttendanceSessions || [];
+  },
+
   async markAttendance(payload, scope = {}) {
     const role = String(scope?.role || '').toUpperCase();
     const response = await dataConnectClient.query(
@@ -161,10 +196,10 @@ export const attendanceService = {
         academicYearId: scope.academicYearId || null,
       });
     }
-    const createPayload = {
+    const createPayload = sanitizeCreateAttendancePayload({
       ...payload,
       status: normalizeAttendanceStatus(payload.status) || payload.status,
-    };
+    });
     const createResponse = await dataConnectClient.mutate(
       DATA_CONNECT_MUTATIONS.CREATE_ATTENDANCE,
       createPayload,
@@ -182,6 +217,22 @@ export const attendanceService = {
     for (const key of uniqueKeys) {
       const [sectionId, attendanceDate] = key.split('|');
       existingBySectionDate[key] = await this.getSectionAttendanceMap({sectionId, attendanceDate});
+      
+      // Upsert the SectionAttendanceSession
+      const firstRecord = records.find(r => r.sectionId === sectionId && r.attendanceDate === attendanceDate);
+      if (firstRecord && !existingBySectionDate[key]?.[firstRecord.studentId]) {
+        await dataConnectClient.mutate(
+          DATA_CONNECT_MUTATIONS.UPSERT_SECTION_ATTENDANCE_SESSION,
+          {
+            sectionId,
+            academicClassId: firstRecord.academicClassId,
+            branchId: firstRecord.branchId || scope?.branchId,
+            date: attendanceDate,
+            submittedByTeacherId: firstRecord.markedById,
+            submittedByTeacherName: firstRecord.markedByName || 'Teaching Staff',
+          }
+        ).catch(e => console.warn('[AttendanceService] Failed to upsert session:', e));
+      }
     }
 
     const saved = [];
@@ -216,7 +267,7 @@ export const attendanceService = {
       } else {
         const response = await dataConnectClient.mutate(
           DATA_CONNECT_MUTATIONS.CREATE_ATTENDANCE,
-          {...record, status},
+          sanitizeCreateAttendancePayload({ ...record, status }),
         );
         saved.push({id: response.attendance_insert?.id || response.attendance_insert, ...record, status});
       }

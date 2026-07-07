@@ -3,7 +3,6 @@ import {AppState} from 'react-native';
 import {NavigationContainer} from '@react-navigation/native';
 import {useDispatch, useSelector} from 'react-redux';
 import {USER_ROLES} from '../config/constants';
-import SplashScreen from '../screens/auth/SplashScreen';
 import {bootstrapAuth, loadActiveAcademicYear, validateSession} from '../store/slices/authSlice';
 import AccountantNavigator from './AccountantNavigator';
 import AuthNavigator from './AuthNavigator';
@@ -18,6 +17,7 @@ import {ensureMasterClassesForBranch} from '../services/academics/SeedMasterClas
 import fcmService from '../services/notifications/fcmService';
 import dataConnectClient from '../services/dataconnect/dataConnectClient';
 import {DATA_CONNECT_MUTATIONS} from '../services/dataconnect/operations';
+import LoadingScreen from '../components/loaders/LoadingScreen';
 
 const getRoleNavigator = role => {
   switch (String(role || '').toUpperCase()) {
@@ -53,6 +53,10 @@ const AppNavigator = () => {
   console.log('AppNavigator render state:', {isBootstrapping, isAuthenticated, isSelectingRole, role});
 
   const tokenRefreshUnsub = useRef(null);
+
+  useEffect(() => {
+    dispatch(bootstrapAuth());
+  }, [dispatch]);
 
   useEffect(() => {
     if (!isAuthenticated || !user?.id) {
@@ -92,7 +96,7 @@ const AppNavigator = () => {
     if (isAuthenticated && user?.branchId) {
       dispatch(loadActiveAcademicYear(user.branchId));
     }
-  }, [isAuthenticated, role, user?.branchId]);
+  }, [dispatch, isAuthenticated, role, user?.branchId]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextState => {
@@ -105,13 +109,7 @@ const AppNavigator = () => {
 
   const renderContent = () => {
     if (isBootstrapping) {
-      console.log('AppNavigator: rendering SplashScreen');
-      return (
-        <SplashScreen onFinish={() => {
-          console.log('AppNavigator: SplashScreen finished, bootstrapping auth...');
-          dispatch(bootstrapAuth());
-        }} />
-      );
+      return <LoadingScreen message="Checking session..." />;
     }
     if (isAuthenticated) {
       console.log('AppNavigator: rendering RoleNavigator for role:', role);

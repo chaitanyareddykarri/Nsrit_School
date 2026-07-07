@@ -56,6 +56,11 @@ export const DATA_CONNECT_QUERIES = {
   GET_MONTHLY_ATTENDANCE_REPORT: 'GetMonthlyAttendanceReport',
   // Alerts
   GET_ATTENDANCE_ALERT_LOG: 'GetAttendanceAlertLog',
+
+  // Section Attendance Sessions
+  GET_SECTION_ATTENDANCE_SESSION: 'GetSectionAttendanceSession',
+  GET_TODAY_ATTENDANCE_SESSIONS_BY_BRANCH: 'GetTodayAttendanceSessionsByBranch',
+
   GET_FEE_DETAILS: 'GetFeeDetails',
   GET_FEE_RECORDS_BY_BRANCH: 'GetFeeRecordsByBranch',
   GET_ALL_FEE_RECORDS: 'GetAllFeeRecords',
@@ -245,5 +250,8 @@ export const DATA_CONNECT_MUTATIONS = {
   CORRECT_ATTENDANCE: 'CorrectAttendance',
   UPSERT_ATTENDANCE_SUMMARY: 'UpsertAttendanceSummary',
   CREATE_ATTENDANCE_ALERT_LOG: 'CreateAttendanceAlertLog',
+
+  // Section Attendance Sessions
+  UPSERT_SECTION_ATTENDANCE_SESSION: 'UpsertSectionAttendanceSession',
 };
 

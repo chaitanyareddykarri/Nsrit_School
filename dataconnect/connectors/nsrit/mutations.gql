@@ -5237,3 +5237,25 @@ mutation UpdateCoordinator(
     }
   )
 }
+
+mutation UpsertSectionAttendanceSession(
+  $sectionId: UUID!
+  $academicClassId: UUID!
+  $branchId: UUID!
+  $date: Date!
+  $submittedByTeacherId: UUID!
+  $submittedByTeacherName: String!
+) @auth(level: USER) {
+  sectionAttendanceSession_upsert(
+    data: {
+      section: {id: $sectionId}
+      date: $date
+      academicClass: {id: $academicClassId}
+      branch: {id: $branchId}
+      submittedByTeacherId: $submittedByTeacherId
+      submittedByTeacherName: $submittedByTeacherName
+      isLocked: true
+      submittedAt_expr: "request.time"
+    }
+  )
+}

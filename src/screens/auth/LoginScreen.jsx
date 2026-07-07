@@ -194,7 +194,7 @@ const LoginScreen = ({navigation}) => {
           </Animated.View>
 
           <Animated.View>
-            <Text style={styles.brandName}>NSRIT Connect</Text>
+            <Text style={styles.brandName}>NSRIT AI Algo Connect</Text>
           </Animated.View>
           <Animated.View>
             <Text style={styles.brandTagline}>Enterprise School Management</Text>

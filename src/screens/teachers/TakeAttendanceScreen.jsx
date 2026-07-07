@@ -51,40 +51,6 @@ const cycleStatus = current => {
   return STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length];
 };
 
-// ── Status Picker Modal ────────────────────────────────────────────────────────
-const StatusPickerModal = ({visible, studentName, currentStatus, onSelect, onClose}) => (
-  <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-    <Pressable style={sp.overlay} onPress={onClose}>
-      <View style={sp.sheet}>
-        <Text style={sp.title}>Mark attendance for</Text>
-        <Text style={sp.studentName} numberOfLines={1}>{studentName}</Text>
-        <View style={sp.divider} />
-        {TEACHER_MARKABLE_STATUSES.map(s => {
-          const color   = ATTENDANCE_STATUS_COLORS[s];
-          const icon    = ATTENDANCE_STATUS_ICONS[s];
-          const label   = ATTENDANCE_STATUS_LABELS[s];
-          const active  = currentStatus === s;
-          return (
-            <Pressable
-              key={s}
-              onPress={() => { onSelect(s); onClose(); }}
-              style={[sp.option, active && {backgroundColor: `${color}15`, borderColor: `${color}40`}]}>
-              <View style={[sp.dot, {backgroundColor: active ? color : `${color}50`}]}>
-                <MaterialCommunityIcons name={icon} size={16} color={active ? colors.white : color} />
-              </View>
-              <Text style={[sp.optLabel, {color: active ? color : colors.text}]}>{label}</Text>
-              {active ? <MaterialCommunityIcons name="check-circle" size={18} color={color} /> : null}
-            </Pressable>
-          );
-        })}
-        <Pressable onPress={onClose} style={sp.cancelBtn}>
-          <Text style={sp.cancelText}>Cancel</Text>
-        </Pressable>
-      </View>
-    </Pressable>
-  </Modal>
-);
-
 // ── Calendar date picker ───────────────────────────────────────────────────────
 const AttendanceDatePicker = ({
   value, onChange, onHolidayTap,
@@ -243,6 +209,9 @@ const TakeAttendanceScreen = () => {
   const todayStr = toISODate();
   const role = String(user?.role || '').toUpperCase();
   const isTeachingRole = [USER_ROLES.TEACHER, USER_ROLES.CLASS_TEACHER].includes(role);
+  const isPrincipalRole = role === USER_ROLES.PRINCIPAL;
+  const isCoordinatorRole = role === USER_ROLES.COORDINATOR;
+  const isMainAdminRole = role === USER_ROLES.MAIN_ADMIN;
 
   const [selectedClassId,   setSelectedClassId]   = useState('');
   const [selectedSectionId, setSelectedSectionId] = useState('');
@@ -253,10 +222,9 @@ const TakeAttendanceScreen = () => {
   const [showCalendar,   setShowCalendar]   = useState(false);
   const [holidayModal,   setHolidayModal]   = useState(null);
   const [statuses,       setStatuses]       = useState({});
-  const [pickerStudent,  setPickerStudent]  = useState(null); // {id, name}
-  const [query,          setQuery]          = useState('');
+    const [query,          setQuery]          = useState('');
   const [error,          setError]          = useState('');
-  const [confirmVisible, setConfirmVisible] = useState(false);
+  
 
   // ── Academic year gate ────────────────────────────────────────────────────
   const yearDates = activeAcademicYear
@@ -282,7 +250,6 @@ const TakeAttendanceScreen = () => {
 
   const nowHour = new Date().getHours();
   const isSundaySelected  = parseDateString(selectedDate)?.getDay() === 0;
-  const isReadOnly        = isTeachingRole && selectedDate !== todayStr;
   const isBeforeWindow    = isTeachingRole && selectedDate === todayStr && nowHour < 8;
   const isAfterWindow     = isTeachingRole && selectedDate === todayStr && nowHour >= 15;
   const isTimeGated       = isBeforeWindow || isAfterWindow;
@@ -307,6 +274,18 @@ const TakeAttendanceScreen = () => {
   };
   const isHolidaySelected = Boolean(combinedHolidayMap[selectedDate]);
   const selectedHoliday   = combinedHolidayMap[selectedDate] || null;
+
+  // Session query to check if already submitted
+  const sessionQuery = useQuery({
+    queryKey: ['sectionAttendanceSession', resolvedSectionId, selectedDate],
+    queryFn: () => attendanceService.getSectionAttendanceSession({sectionId: resolvedSectionId, date: selectedDate}),
+    enabled: Boolean(resolvedSectionId && selectedDate),
+  });
+  const attendanceSession = sessionQuery.data;
+  
+  // Teachers can only edit if it's today and no session exists, or if they have special roles
+  const canEdit = isPrincipalRole || isCoordinatorRole || (selectedDate === todayStr && !attendanceSession);
+  const isReadOnly = !canEdit;
 
   const effectiveReadOnly = isReadOnly || isTimeGated || isSundaySelected || isHolidaySelected;
 
@@ -414,17 +393,15 @@ const TakeAttendanceScreen = () => {
   const setAll = status =>
     setStatuses(students.reduce((acc, s) => ({...acc, [s.id]: status}), {}));
 
-  // ── Status picker ─────────────────────────────────────────────────────────
-  const openPicker = studentId => {
-    const student = students.find(s => s.id === studentId);
-    if (student && !effectiveReadOnly) { setPickerStudent({id: studentId, name: student.fullName}); }
+  // ── Toggle Attendance ────────────────────────────────────────────────────────
+  const toggleAttendance = studentId => {
+    setStatuses(cur => ({
+      ...cur,
+      [studentId]: cur[studentId] === ATTENDANCE_STATUS.PRESENT ? ATTENDANCE_STATUS.ABSENT : ATTENDANCE_STATUS.PRESENT,
+    }));
   };
 
-  const handleStatusSelect = newStatus => {
-    if (!pickerStudent) { return; }
-    setStatuses(cur => ({...cur, [pickerStudent.id]: newStatus}));
-    setPickerStudent(null);
-  };
+
 
   // ── Submit ────────────────────────────────────────────────────────────────
   const mutation = useMutation({
@@ -441,6 +418,7 @@ const TakeAttendanceScreen = () => {
         status:          statuses[student.id] || ATTENDANCE_STATUS.PRESENT,
         markedById:      user.id,
         markedByRole:    user.role,
+        markedByName:    user.fullName,
       }));
       return attendanceService.saveAttendanceBatch({records}, scope);
     },
@@ -522,32 +500,40 @@ const TakeAttendanceScreen = () => {
             onChange={d => { setSelectedDate(d); setShowCalendar(false); }}
           />
         ) : null}
-
-        {isSundaySelected ? (
-          <View style={styles.banner}>
-            <MaterialCommunityIcons name="calendar-weekend" size={13} color={colors.danger} />
-            <Text style={[styles.bannerText, {color: colors.danger}]}>Sunday — attendance not applicable</Text>
-          </View>
-        ) : isHolidaySelected ? (
-          <View style={[styles.banner, {backgroundColor: '#FFF7ED', borderColor: '#F97316'}]}>
-            <MaterialCommunityIcons name="star-circle-outline" size={13} color="#F97316" />
-            <Text style={[styles.bannerText, {color: '#F97316'}]}>
-              {selectedHoliday?.name || 'Holiday'} — no attendance on holidays
-            </Text>
-          </View>
-        ) : isTimeGated ? (
-          <View style={styles.banner}>
-            <MaterialCommunityIcons name="clock-alert-outline" size={13} color={colors.warning} />
-            <Text style={styles.bannerText}>
-              {isBeforeWindow ? 'Attendance window opens at 8:00 AM' : 'Attendance window closed at 3:00 PM'}
-            </Text>
-          </View>
-        ) : isReadOnly ? (
-          <View style={styles.banner}>
-            <MaterialCommunityIcons name="eye-outline" size={13} color={colors.warning} />
-            <Text style={styles.bannerText}>View only — only today's attendance can be edited</Text>
-          </View>
-        ) : null}
+      
+      {/* Date/Status Info Banners */}
+      {isSundaySelected ? (
+        <View style={styles.banner}>
+          <MaterialCommunityIcons name="white-balance-sunny" size={13} color={colors.warning} />
+          <Text style={styles.bannerText}>Sunday - Attendance not required</Text>
+        </View>
+      ) : isHolidaySelected ? (
+        <View style={[styles.banner, {backgroundColor: 'rgba(33, 150, 243, 0.1)', borderColor: 'rgba(33, 150, 243, 0.2)'}]}>
+          <MaterialCommunityIcons name="calendar-star" size={13} color="#2196F3" />
+          <Text style={[styles.bannerText, {color: '#1976D2'}]}>
+            Holiday: {selectedHoliday?.name}
+          </Text>
+        </View>
+      ) : isTimeGated ? (
+        <View style={styles.banner}>
+          <MaterialCommunityIcons name="clock-alert-outline" size={13} color={colors.warning} />
+          <Text style={styles.bannerText}>
+            Attendance window is from 8:00 AM to 3:00 PM
+          </Text>
+        </View>
+      ) : attendanceSession ? (
+        <View style={[styles.banner, {backgroundColor: `${colors.success}15`, borderColor: `${colors.success}40`}]}>
+          <MaterialCommunityIcons name="check-circle" size={13} color={colors.success} />
+          <Text style={[styles.bannerText, {color: colors.success}]}>
+            Submitted by {attendanceSession.submittedByTeacherName} at {new Date(attendanceSession.submittedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+          </Text>
+        </View>
+      ) : isReadOnly ? (
+        <View style={styles.banner}>
+          <MaterialCommunityIcons name="eye-outline" size={13} color={colors.warning} />
+          <Text style={styles.bannerText}>View only - past attendance cannot be edited</Text>
+        </View>
+      ) : null}
 
         {students.length > 0 ? (
           <View style={styles.progressWrap}>
@@ -678,7 +664,7 @@ const TakeAttendanceScreen = () => {
               section: `${item.academicClass?.name || ''}–${item.section?.name || ''}`,
             }}
             status={statuses[item.id] || ATTENDANCE_STATUS.PRESENT}
-            onStatusPress={effectiveReadOnly ? undefined : openPicker}
+            onToggle={effectiveReadOnly ? undefined : () => toggleAttendance(item.id)}
             disabled={effectiveReadOnly}
           />
         )}
@@ -739,7 +725,7 @@ const TakeAttendanceScreen = () => {
           </View>
         ) : (
           <Pressable
-            onPress={() => setConfirmVisible(true)}
+            onPress={() => mutation.mutate()}
             disabled={mutation.isPending || !selectedClass || !selectedSection || !students.length}
             style={[
               styles.saveBtn,
@@ -761,25 +747,9 @@ const TakeAttendanceScreen = () => {
         )}
       </View>
 
-      {/* Status picker modal */}
-      <StatusPickerModal
-        visible={Boolean(pickerStudent)}
-        studentName={pickerStudent?.name || ''}
-        currentStatus={pickerStudent ? (statuses[pickerStudent.id] || ATTENDANCE_STATUS.PRESENT) : ATTENDANCE_STATUS.PRESENT}
-        onSelect={handleStatusSelect}
-        onClose={() => setPickerStudent(null)}
-      />
 
-      {/* Submit confirmation */}
-      <ConfirmationModal
-        visible={confirmVisible}
-        title="Submit Attendance?"
-        message={`Submit attendance for ${students.length} student${students.length !== 1 ? 's' : ''} in ${selectedClass?.name || ''}${selectedSection ? `–${selectedSection.name}` : ''} for ${formatDateForDisplay(selectedDate)}?\n\nPresent: ${counts.present}  Absent: ${counts.absent}  Half Day: ${counts.halfDay}  Late: ${counts.late}  Medical: ${counts.medical}  Approved: ${counts.approved}\n\nThis cannot be edited by you after submission.`}
-        confirmLabel="Yes, Submit & Lock"
-        cancelLabel="Cancel"
-        onConfirm={() => { setConfirmVisible(false); mutation.mutate(); }}
-        onCancel={() => setConfirmVisible(false)}
-      />
+
+      
 
       {/* Holiday info modal */}
       <ConfirmationModal
@@ -877,19 +847,6 @@ const cal = StyleSheet.create({
   legendItem: {alignItems: 'center', flexDirection: 'row', gap: 4},
   legendDot: {borderRadius: 3, height: 6, width: 6},
   legendText: {color: 'rgba(255,255,255,0.8)', fontSize: 9, fontWeight: '700'},
-});
-
-const sp = StyleSheet.create({
-  overlay:    {backgroundColor: 'rgba(0,0,0,0.5)', flex: 1, justifyContent: 'flex-end'},
-  sheet:      {backgroundColor: colors.surface, borderTopLeftRadius: radius.hero, borderTopRightRadius: radius.hero, padding: spacing.lg, paddingBottom: spacing.xxxl},
-  title:      {color: colors.textMuted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textAlign: 'center', textTransform: 'uppercase'},
-  studentName:{color: colors.text, fontSize: 16, fontWeight: '800', marginTop: 4, textAlign: 'center'},
-  divider:    {backgroundColor: colors.border, height: 1, marginVertical: spacing.md},
-  option:     {alignItems: 'center', borderColor: colors.border, borderRadius: radius.card, borderWidth: 1.5, flexDirection: 'row', gap: spacing.md, marginBottom: spacing.sm, padding: spacing.md},
-  dot:        {alignItems: 'center', borderRadius: radius.pill, height: 34, justifyContent: 'center', width: 34},
-  optLabel:   {flex: 1, fontSize: 14, fontWeight: '700'},
-  cancelBtn:  {alignItems: 'center', marginTop: spacing.sm, paddingVertical: spacing.md},
-  cancelText: {color: colors.textMuted, fontSize: 14, fontWeight: '600'},
 });
 
 export default TakeAttendanceScreen;

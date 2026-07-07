@@ -202,9 +202,9 @@ query GetStudentsBySection($sectionId: UUID!, $limit: Int = 50, $offset: Int = 0
             {teacher_on_user: {teacherSectionAssignments_on_teacher: {exist: {sectionId: {eq: $sectionId}, isActive: {eq: true}}}}}
             # Class teacher of this section (Section.classTeacher → User reverse relation)
             {sections_on_classTeacher: {exist: {id: {eq: $sectionId}, isActive: {eq: true}}}}
-            # Branch-level leadership (PRINCIPAL, BRANCH_ADMIN, COORDINATOR, ACCOUNTANT)
-            {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "ACCOUNTANT", "accountant"]}}
-            {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "ACCOUNTANT", "accountant"]}}}}
+            # Branch-level leadership & teaching staff
+            {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "ACCOUNTANT", "accountant", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}
+            {userRoles_on_user: {exist: {role: {in: ["PRINCIPAL", "principal", "COMPUTER_OPERATOR", "computer_operator", "BRANCH_ADMIN", "branch_admin", "COORDINATOR", "coordinator", "ACCOUNTANT", "accountant", "TEACHER", "teacher", "CLASS_TEACHER", "class_teacher"]}}}}
           ]
         }
       ]
@@ -4913,7 +4913,7 @@ query GetActiveAcademicYear($branchId: UUID!) @auth(level: USER) {
   currentUser: users(
     where: {firebaseUID: {eq_expr: "auth.uid"}, isActive: {eq: true}}
     limit: 1
-  ) @redact @check(expr: "this.exists(u, u.role == 'PRINCIPAL' || u.role == 'COMPUTER_OPERATOR' || u.role == 'computer_operator' || u.role == 'COORDINATOR' || u.role == 'MAIN_ADMIN')", message: "Principal or Coordinator only") {
+  ) @redact @check(expr: "this.exists(u, u.role == 'PRINCIPAL' || u.role == 'COMPUTER_OPERATOR' || u.role == 'computer_operator' || u.role == 'COORDINATOR' || u.role == 'MAIN_ADMIN' || u.role == 'TEACHER' || u.role == 'teacher' || u.role == 'CLASS_TEACHER' || u.role == 'class_teacher')", message: "Access denied") {
     id
     role
   }
@@ -5700,5 +5700,28 @@ query GetExamsBySection(
         academicClassId
       }
     }
+  }
+}
+
+query GetSectionAttendanceSession($sectionId: UUID!, $date: Date!) @auth(level: USER) {
+  sectionAttendanceSession(key: {sectionId: $sectionId, date: $date}) {
+    sectionId
+    date
+    submittedByTeacherId
+    submittedByTeacherName
+    submittedAt
+    isLocked
+  }
+}
+
+query GetTodayAttendanceSessionsByBranch($branchId: UUID!, $date: Date!) @auth(level: USER) {
+  sectionAttendanceSessions(where: {branchId: {eq: $branchId}, date: {eq: $date}}) {
+    sectionId
+    academicClassId
+    date
+    submittedByTeacherId
+    submittedByTeacherName
+    submittedAt
+    isLocked
   }
 }

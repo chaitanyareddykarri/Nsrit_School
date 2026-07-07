@@ -1,10 +1,10 @@
-﻿import React, {useCallback, useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {Pressable, ScrollView, StyleSheet, View} from 'react-native';
 import {Text} from 'react-native-paper';
 import Animated, {} from 'react-native-reanimated';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import {useFocusEffect} from '@react-navigation/native';
-import {useDispatch, useSelector} from 'react-redux';
+import {useQuery} from '@tanstack/react-query';
+import {useSelector} from 'react-redux';
 import {
   AnimatedProgressBar,
   EmptyState,
@@ -12,7 +12,6 @@ import {
   SectionHeader} from '../../components';
 import feeService from '../../services/fees/feeService';
 import useFeeAccess from '../../hooks/useFeeAccess';
-import {fetchFees} from '../../store/slices/feeSlice';
 import {formatCurrency} from '../../utils/formatters/currency';
 import {toISODate} from '../../utils/helpers/dateHelpers';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -42,20 +41,33 @@ const ActionTile = ({icon, label, sub, color, onPress, delay = 0}) => (
 );
 
 const DashboardScreen = ({navigation}) => {
-  const dispatch = useDispatch();
   const user = useSelector(state => state.auth.user);
   const [menuOpen, setMenuOpen] = useState(false);
   const access = useFeeAccess();
 
-  const {records, payments, summary, loading, error} = useSelector(state => state.fees);
+  const {data, isLoading: loading, error, refetch} = useQuery({
+    queryKey: ['accountantFeeDashboard', access.branchId],
+    queryFn: () => feeService.getFeeReports(access),
+    enabled: Boolean(access.branchId)
+  });
 
-  useFocusEffect(
-    useCallback(() => {
-      if (access.branchId) {
-        dispatch(fetchFees(access));
-      }
-    }, [access, dispatch]),
-  );
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      refetch();
+    });
+    return unsubscribe;
+  }, [navigation, refetch]);
+
+  const records = data?.records || [];
+  const payments = data?.payments || [];
+  const summary = data?.summary || {
+    totalFee: 0,
+    paidAmount: 0,
+    dueAmount: 0,
+    paidStudents: 0,
+    dueStudents: 0,
+    collectionRate: 0,
+  };
 
   const today = toISODate(new Date());
   const todaysCollections = payments

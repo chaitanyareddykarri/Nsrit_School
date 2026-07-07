@@ -1,4 +1,4 @@
-﻿import React, {useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {FlatList, Pressable, StyleSheet, TextInput, View} from 'react-native';
 import {Text} from 'react-native-paper';
 import Animated, {} from 'react-native-reanimated';
@@ -116,11 +116,16 @@ const CreateFeePlanScreen = ({navigation, route}) => {
       queryClient.invalidateQueries({queryKey: ['studentFeeProfile', selectedStudent?.id]});
       queryClient.invalidateQueries({queryKey: ['feeReports']});
       queryClient.invalidateQueries({queryKey: ['coordinatorFeeDashboard']});
+      queryClient.invalidateQueries({queryKey: ['branchAdminFeeDashboard']});
       queryClient.invalidateQueries({queryKey: ['principalFeeSummary']});
       queryClient.invalidateQueries({queryKey: ['accountantFeeDashboard']});
+      queryClient.invalidateQueries({queryKey: ['operatorDashboard']});
+      queryClient.invalidateQueries({queryKey: ['operatorFeeSummary']});
+      queryClient.invalidateQueries({queryKey: ['teacherFeeStatus']});
       queryClient.invalidateQueries({queryKey: ['parentChildren']});
       queryClient.invalidateQueries({queryKey: ['parentDashboard']});
       queryClient.invalidateQueries({queryKey: ['studentDetails', selectedStudent?.id]});
+      queryClient.invalidateQueries({queryKey: ['mainAdminRevenue']});
       navigation.goBack();
     },
     onError: err => setError(err.message)});

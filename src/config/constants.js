@@ -1,4 +1,4 @@
-export const APP_NAME = 'NSRIT Connect';
+export const APP_NAME = 'NSRIT AI Algo Connect';
 
 export const USER_ROLES = {
   MAIN_ADMIN: 'MAIN_ADMIN',
@@ -134,10 +134,6 @@ export const ATTENDANCE_STATUS_COLORS = {
 export const TEACHER_MARKABLE_STATUSES = [
   'PRESENT',
   'ABSENT',
-  'HALF_DAY',
-  'LATE',
-  'MEDICAL_LEAVE',
-  'APPROVED_LEAVE',
 ];
 
 // Statuses that count as "present" for attendance percentage

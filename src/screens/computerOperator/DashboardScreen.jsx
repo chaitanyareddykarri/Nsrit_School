@@ -81,6 +81,14 @@ const DashboardScreen = ({navigation}) => {
     setRefreshing(false);
   }, [refetchDash, refetchFee]);
 
+  React.useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      refetchDash();
+      refetchFee();
+    });
+    return unsubscribe;
+  }, [navigation, refetchDash, refetchFee]);
+
   const getGreeting = () => {
     const h = new Date().getHours();
     if (h < 12) {return 'Good morning';}
