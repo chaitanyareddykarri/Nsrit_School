@@ -1,0 +1,55 @@
+name: Build Android Debug APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/ci.yml
+  android:
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: android-build
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.19.0'
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: npm ci
+      - name: Restore native and JavaScript configuration
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          APP_ENV_JS: ${{ secrets.APP_ENV_JS }}
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const {GOOGLE_SERVICES_JSON, APP_ENV_JS} = process.env;
+          if (!GOOGLE_SERVICES_JSON || !APP_ENV_JS) throw new Error('Set both android-build config secrets');
+          const config = JSON.parse(GOOGLE_SERVICES_JSON);
+          if (!config.client?.some(c => c.client_info?.android_client_info?.package_name === 'com.nsritschoolapp')) throw new Error('Android application ID mismatch');
+          fs.writeFileSync('android/app/google-services.json', GOOGLE_SERVICES_JSON);
+          fs.writeFileSync('src/config/env.js', APP_ENV_JS);
+          NODE
+      - name: Install repository SDK versions
+        run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0' 'ndk;27.1.12297006'
+      - name: Assemble debug APK (requires Metro when installed)
+        working-directory: android
+        run: bash ./gradlew assembleDebug --no-daemon -PreactNativeArchitectures=arm64-v8a,x86_64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nsrit-debug-${{ github.sha }}
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 7

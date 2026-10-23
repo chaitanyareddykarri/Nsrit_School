@@ -1,4 +1,6 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+NSRIT Connect is a React Native school-management app backed by Firebase.
+
+See [setup requirements](SETUP_CHECKLIST.md) and [GitHub CI/CD setup](.github/CI_CD.md) for current configuration, checks, required GitHub secrets, and deployment limits.
 
 # Getting Started
 

@@ -6,12 +6,12 @@ it('defines all supported NSRIT Connect roles', () => {
     'MAIN_ADMIN',
     'BRANCH_ADMIN',
     'PRINCIPAL',
+    'COMPUTER_OPERATOR',
     'COORDINATOR',
     'TEACHER',
     'CLASS_TEACHER',
     'PARENT',
     'ACCOUNTANT',
-    'FRONT_DESK',
   ]);
 
   expect(ROLE_LABELS[USER_ROLES.TEACHER]).toBe('Teacher');

@@ -84,6 +84,7 @@ describe('parentService.createParent', () => {
     expect(dataConnectClient.mutate).toHaveBeenCalledWith(DATA_CONNECT_MUTATIONS.LINK_PARENT_USER, {
       parentId: 'parent-1',
       userId: 'user-teacher-1',
+      branchId: 'branch-1',
     });
     expect(result).toEqual({ id: 'parent-1', userId: 'user-teacher-1', phoneNumber: '9876543210' });
   });
@@ -120,6 +121,7 @@ describe('parentService.createParent', () => {
     expect(dataConnectClient.mutate).toHaveBeenCalledWith(DATA_CONNECT_MUTATIONS.LINK_PARENT_USER, {
       parentId: 'parent-1',
       userId: 'new-user-1',
+      branchId: 'branch-1',
     });
     expect(result).toEqual({ id: 'parent-1', userId: 'new-user-1', phoneNumber: '9876543210' });
   });

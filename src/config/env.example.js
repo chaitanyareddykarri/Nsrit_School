@@ -17,6 +17,11 @@ export const apiConfig = {
 export const USE_EMULATOR = false;
 export const USE_AUTH_EMULATOR = false;
 
+// Required by RoleSwitcherModal. Keep bypass disabled for real accounts.
+export const authConfig = {
+  ENABLE_DEV_OTP_BYPASS: false,
+};
+
 const EMULATOR_HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
 
 export const dataConnectConfig = {

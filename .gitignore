@@ -48,7 +48,8 @@ coverage/
 
 # Temporary files
 *.tmp
-*.temp# Xcode
+*.temp
+# Xcode
 #
 build/
 *.pbxuser
@@ -128,7 +129,7 @@ yarn-error.log
 *google-services.json
 
 # Local and System Generated
-.agents\skills
+.agents/skills/
 
 *skills-lock.json
 
@@ -154,3 +155,10 @@ dataconnect/.dataconnect/
 # Debug and local log files
 *-debug.log
 *.log
+
+# CI federation credentials and private signing material
+gha-creds-*.json
+*.jks
+*.p12
+*.p8
+*.mobileprovision
